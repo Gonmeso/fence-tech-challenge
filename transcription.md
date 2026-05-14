@@ -261,3 +261,53 @@
   calculation pass succeeded and produced compliant results for all three sample
   facilities with the current default thresholds: Educa `18.33`, PayEarly
   `0.00`, and Nomina `3.39`.
+
+## Entry 013
+- Timestamp: 2026-05-14 19:45:45 CEST
+- Type: misc
+- Status: completed
+- Human
+  Check the current changes and create a list of commits with the changes, add
+  the neccessary files and create the commit
+- Agent
+  Reviewed the working tree and split the pending changes into two coherent
+  commits instead of one mixed commit. The first group covered repository
+  instruction changes and transcript updates, which became
+  `docs(agents): update repo instructions and transcript`. The second group
+  covered the new backend domain layer, including threshold settings, facility
+  schemas, covenant result schemas, and calculator classes, which became
+  `feat(backend): add facility schemas and calculators`. After staging each
+  group separately and creating both commits, verified the recent git history and
+  confirmed the working tree was clean.
+
+## Entry 014
+- Timestamp: 2026-05-14 19:55:43 CEST
+- Type: development
+- Status: completed
+- Human
+  lets add pytest
+
+  * Add pytest as a dependency
+  * Create integration tests for the APi, now for the health endpoint
+  * Create unitests for the schemas, make sure that they pass
+  * Create the unitests for the calculators
+  * Update so the thresholds are used in the calculators
+  * Create unit tests for the calculators, make sure that they pass
+  * For the calculators create a tests that uses the real jsons
+
+  All the tests should try to cover edge cases like different types, values with
+  values that are not expected, null values and so on
+- Agent
+  Added `pytest` to the backend dev dependencies and also added `httpx` because
+  Starlette's `TestClient` requires it for integration testing. Then created a
+  backend test suite with an integration test for the health endpoint, schema
+  unit tests for Educa, PayEarly, and Nomina, calculator unit tests covering
+  threshold-driven compliant and breach behavior plus excluded-asset reporting,
+  and real-data calculator tests that execute the calculators against the three
+  extracted JSON datasets. The schema tests cover edge cases around case
+  sensitivity, null required values, malformed dates and datetimes, coercible
+  numeric strings, zero and invalid tenor-like values, and portfolio wrapping.
+  After a few fixes to the test harness and expectations, reran formatting,
+  linting, typing, and pytest until all checks passed. Final verification was
+  `uv run ruff check .`, `uv run ty check .`, and `uv run pytest -q`, with
+  `28 passed`.
