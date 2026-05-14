@@ -1,0 +1,700 @@
+Tech Challenge Instructions Senior Product Engineering
+Objective
+This exercise is designed to serve as the basis for a technical discussion in the
+next interview step. It is not intended to take more than 2–4 hours. Please
+prioritize clarity of thought and decision-making over completeness or perfection.
+
+💡
+
+You are expected to leverage AI as much as possible. Feel free to use
+any AI model of your choice. Share your full AI conversation transcript —
+how you steer the AI is as important as the output itself.
+
+Context
+Fence is a tech-native facility agent for asset-backed finance. As part of its
+Calculation Agency service, Fence automates covenant compliance for credit
+facilities — running calculations on live portfolio data so that both Capital
+Providers and Asset Originators can trust the numbers in real time.
+Fence operates multiple facilities with different Asset Originators. Each facility:
+
+Tech Challenge Instructions - Senior Product Engineering
+
+1
+
+Has its own asset data model — some fields are shared across all facilities
+(e.g., external_id , amount ), but each originator may report additional fields
+specific to their asset class
+Has its own effective interest rate calculation — the formula for computing
+the portfolio's effective interest rate is defined in each facility's Credit
+Agreement and differs across clients
+The effective interest rate is a covenant — a binding term of the Credit Agreement
+between the Capital Provider and the Asset Originator. Once computed and
+published, both parties must be able to independently verify its value, and it may
+be used as input for automated settlement, compliance checks, or waterfall
+execution.
+
+The Problem
+Build a system that allows Fence to:
+1. Ingest asset portfolio data from each originator
+2. Compute the effective interest rate according to each facility's rules
+3. Publish the rate as a covenant — stored in a Smart Contract so that both the
+Capital Provider and the Asset Originator can independently verify the rate
+and trust it as a source of truth for downstream financial processes
+The system must support the fact that asset data models and calculation logic
+vary across facilities.
+Below you will find sample portfolio data from three facilities and the rate
+calculation specifications extracted from each facility's Credit Agreement.
+
+Portfolio Data
+Each originator exports data in their own format — field names, date formats, and
+status vocabularies vary across facilities.
+
+Facility A — Educa Capital I (ISA / Education Loans)
+facility_a_educa_isa.json (8 assets)
+
+Tech Challenge Instructions - Senior Product Engineering
+
+2
+
+[
+{
+"external_id": "EDU-STU-10001",
+"effective_date": "2024-06-25",
+"reporting_date": "2026-01-15",
+"status": "open",
+"is_eligible": true,
+"student_id": "STU-10001",
+"school_id": "SCH-001",
+"loan_status": "current",
+"disbursement_amount": 6500.00,
+"outstanding_amount": 4875.00,
+"repaid_amount": 1625.00,
+"interest_rate_percentage": 20.86,
+"days_past_due": 0,
+"country": "ES",
+"amount": 6500.00
+},
+{
+"external_id": "EDU-STU-10002",
+"effective_date": "2024-08-15",
+"reporting_date": "2026-01-15",
+"status": "open",
+"is_eligible": true,
+"student_id": "STU-10002",
+"school_id": "SCH-002",
+"loan_status": "current",
+"disbursement_amount": 12000.00,
+"outstanding_amount": 10200.00,
+"repaid_amount": 1800.00,
+"interest_rate_percentage": 18.54,
+"days_past_due": 0,
+"country": "ES",
+"amount": 12000.00
+},
+
+Tech Challenge Instructions - Senior Product Engineering
+
+3
+
+{
+"external_id": "EDU-STU-10003",
+"effective_date": "2024-05-10",
+"reporting_date": "2026-01-15",
+"status": "open",
+"is_eligible": false,
+"student_id": "STU-10003",
+"school_id": "SCH-001",
+"loan_status": "delinquent",
+"disbursement_amount": 7850.00,
+"outstanding_amount": 7100.00,
+"repaid_amount": 750.00,
+"interest_rate_percentage": 25.11,
+"days_past_due": 90,
+"country": "ES",
+"amount": 7850.00
+},
+{
+"external_id": "EDU-STU-10004",
+"effective_date": "2024-09-01",
+"reporting_date": "2026-01-15",
+"status": "open",
+"is_eligible": true,
+"student_id": "STU-10004",
+"school_id": "SCH-003",
+"loan_status": "current",
+"disbursement_amount": 15000.00,
+"outstanding_amount": 14250.00,
+"repaid_amount": 750.00,
+"interest_rate_percentage": 16.20,
+"days_past_due": 0,
+"country": "ES",
+"amount": 15000.00
+},
+{
+"external_id": "EDU-STU-10005",
+
+Tech Challenge Instructions - Senior Product Engineering
+
+4
+
+"effective_date": "2024-03-20",
+"reporting_date": "2026-01-15",
+"status": "Open",
+"is_eligible": true,
+"student_id": "STU-10005",
+"school_id": "SCH-002",
+"loan_status": "current",
+"disbursement_amount": 9500.00,
+"outstanding_amount": 6650.00,
+"repaid_amount": 2850.00,
+"interest_rate_percentage": 22.00,
+"days_past_due": 0,
+"country": "ES",
+"amount": 9500.00
+},
+{
+"external_id": "EDU-STU-10006",
+"effective_date": "2024-07-12",
+"reporting_date": "2026-01-15",
+"status": "closed",
+"is_eligible": false,
+"student_id": "STU-10006",
+"school_id": "SCH-001",
+"loan_status": "written_off",
+"disbursement_amount": 3200.00,
+"outstanding_amount": 3200.00,
+"repaid_amount": 0.00,
+"interest_rate_percentage": 19.50,
+"days_past_due": 180,
+"country": "ES",
+"amount": 3200.00
+},
+{
+"external_id": "EDU-STU-10007",
+"effective_date": "2024-11-05",
+"reporting_date": "2026-01-15",
+
+Tech Challenge Instructions - Senior Product Engineering
+
+5
+
+"status": "OPEN",
+"is_eligible": true,
+"student_id": "STU-10007",
+"school_id": "SCH-003",
+"loan_status": "current",
+"disbursement_amount": 18000.00,
+"outstanding_amount": 16200.00,
+"repaid_amount": 1800.00,
+"interest_rate_percentage": 17.80,
+"days_past_due": 0,
+"country": "ES",
+"amount": 18000.00
+},
+{
+"external_id": "EDU-STU-10008",
+"effective_date": "2025-01-20",
+"reporting_date": "2026-01-15",
+"status": "open",
+"is_eligible": true,
+"student_id": "STU-10008",
+"school_id": "SCH-001",
+"loan_status": "current",
+"disbursement_amount": 7000.00,
+"outstanding_amount": 7000.00,
+"repaid_amount": 0.00,
+"interest_rate_percentage": null,
+"days_past_due": 0,
+"country": "ES",
+"amount": 7000.00
+}
+]
+
+Facility B — PayEarly US (Earned Wage Access)
+facility_b_payearly_ewa.json (8 assets)
+
+Tech Challenge Instructions - Senior Product Engineering
+
+6
+
+[
+{
+"external_id": "a49c66dd-507d-4087-8ba7-be54153040ef",
+"created_at": "2023-07-22T13:52:25+00:00",
+"due_date": "2025-07-28",
+"last_updated": "2026-01-20T17:23:11.783Z",
+"status": "defaulted",
+"is_eligible": false,
+"employer_id": "1d369e20-0e9a-410f-98cb-e4977a0a0240",
+"employer_name": "ClearHaven Hospitality Group",
+"employee_id": "0f2af6bd-3da3-11ed-91b9-0242ac110011",
+"user_state": "WI",
+"total_principal_amount": 7111.86,
+"outstanding_principal_amount": 7111.86,
+"repaid_principal_amount": 0.00,
+"total_fee_amount": 2.92,
+"outstanding_fee_amount": 2.92,
+"receivable_currency": "USD",
+"days_past_due": 199,
+"amount": 7111.86
+},
+{
+"external_id": "b60d823e-618e-4f08-9c98-cf65264151f0",
+"created_at": "2025-06-15T09:00:00+00:00",
+"due_date": "2026-03-15",
+"last_updated": "2026-01-20T17:23:11.783Z",
+"status": "PERFORMING",
+"is_eligible": true,
+"employer_id": "1d369e20-0e9a-410f-98cb-e4977a0a0240",
+"employer_name": "ClearHaven Hospitality Group",
+"employee_id": "ac40b215-74ca-5d6b-a2de-519f464663d9",
+"user_state": "WI",
+"total_principal_amount": 8500.00,
+"outstanding_principal_amount": 3400.00,
+"repaid_principal_amount": 5100.00,
+
+Tech Challenge Instructions - Senior Product Engineering
+
+7
+
+"total_fee_amount": 1.75,
+"outstanding_fee_amount": 1.75,
+"receivable_currency": "USD",
+"days_past_due": 0,
+"amount": 8500.00
+},
+{
+"external_id": "c71e934f-729f-5a19-ad09-da76375262a1",
+"created_at": "2025-08-01T14:30:00+00:00",
+"due_date": "2026-06-01",
+"last_updated": "2026-01-20T17:23:11.783Z",
+"status": "performing",
+"is_eligible": true,
+"employer_id": "1d369e20-0e9a-410f-98cb-e4977a0a0240",
+"employer_name": "ClearHaven Hospitality Group",
+"employee_id": "c76895c9-7553-541c-b19f-09d9dd5ff662",
+"user_state": "TX",
+"total_principal_amount": 22300.50,
+"outstanding_principal_amount": 15610.35,
+"repaid_principal_amount": 6690.15,
+"total_fee_amount": 4.60,
+"outstanding_fee_amount": 4.60,
+"receivable_currency": "USD",
+"days_past_due": 0,
+"amount": 22300.50
+},
+{
+"external_id": "d82fa45a-830a-6b20-be10-eb87486373b2",
+"created_at": "2025-09-10T08:00:00+00:00",
+"due_date": "2026-02-28",
+"last_updated": "2026-01-20T17:23:11.783Z",
+"status": "performing",
+"is_eligible": true,
+"employer_id": "2e470f31-1fab-521a-a9dc-f5088b1b1351",
+"employer_name": "Summit Ridge Healthcare",
+"employee_id": "6f393afe-61b5-5e40-88fc-a427b0ce0346",
+
+Tech Challenge Instructions - Senior Product Engineering
+
+8
+
+"user_state": "CA",
+"total_principal_amount": 5200.00,
+"outstanding_principal_amount": 2600.00,
+"repaid_principal_amount": 2600.00,
+"total_fee_amount": 1.10,
+"outstanding_fee_amount": 1.10,
+"receivable_currency": "USD",
+"days_past_due": 0,
+"amount": 5200.00
+},
+{
+"external_id": "e93ab56b-941b-7c31-cf21-fc98597484c3",
+"created_at": "2025-10-01T11:00:00+00:00",
+"due_date": "2026-01-15",
+"last_updated": "2026-01-20T17:23:11.783Z",
+"status": "delinquent",
+"is_eligible": true,
+"employer_id": "2e470f31-1fab-521a-a9dc-f5088b1b1351",
+"employer_name": "Summit Ridge Healthcare",
+"employee_id": "48bce6fd-cdb1-58d4-a534-a2c3e43042a7",
+"user_state": "CA",
+"total_principal_amount": 31000.00,
+"outstanding_principal_amount": 28500.00,
+"repaid_principal_amount": 2500.00,
+"total_fee_amount": 6.40,
+"outstanding_fee_amount": 6.40,
+"receivable_currency": "USD",
+"days_past_due": 45,
+"amount": 31000.00
+},
+{
+"external_id": "f04bc67c-a52c-8d42-da32-ad09608595d4",
+"created_at": "2025-11-15T10:00:00+00:00",
+"due_date": "2026-05-10",
+"last_updated": "2026-01-20T17:23:11.783Z",
+"status": "performing",
+
+Tech Challenge Instructions - Senior Product Engineering
+
+9
+
+"is_eligible": true,
+"employer_id": "3f581a42-2abc-632b-bae0-a6199c2c2462",
+"employer_name": "Beacon Valley Logistics",
+"employee_id": "48f5f800-6b30-5a90-a891-32673943f403",
+"user_state": "FL",
+"total_principal_amount": 18750.00,
+"outstanding_principal_amount": 12500.00,
+"repaid_principal_amount": 6250.00,
+"total_fee_amount": 3.85,
+"outstanding_fee_amount": 3.85,
+"receivable_currency": "USD",
+"days_past_due": 0,
+"amount": 18750.00
+},
+{
+"external_id": "g15cd78d-b63d-9e53-eb43-be10719606e5",
+"created_at": "2025-12-01T09:30:00+00:00",
+"due_date": "2026-08-01",
+"last_updated": "2026-01-20T17:23:11.783Z",
+"status": "Performing",
+"is_eligible": true,
+"employer_id": "3f581a42-2abc-632b-bae0-a6199c2c2462",
+"employer_name": "Beacon Valley Logistics",
+"employee_id": "7b3878bc-bf83-5f2e-b4f4-3bf170646a17",
+"user_state": "FL",
+"total_principal_amount": 42000.00,
+"outstanding_principal_amount": 33600.00,
+"repaid_principal_amount": 8400.00,
+"total_fee_amount": 8.65,
+"outstanding_fee_amount": 8.65,
+"receivable_currency": "USD",
+"days_past_due": 0,
+"amount": 42000.00
+},
+{
+"external_id": "h26de89e-c74e-0f64-fc54-cf21820717f6",
+
+Tech Challenge Instructions - Senior Product Engineering
+
+10
+
+"created_at": "2025-05-01T08:00:00+00:00",
+"due_date": "2025-12-31",
+"last_updated": "2026-01-20T17:23:11.783Z",
+"status": "repaid",
+"is_eligible": true,
+"employer_id": "1d369e20-0e9a-410f-98cb-e4977a0a0240",
+"employer_name": "ClearHaven Hospitality Group",
+"employee_id": "2a3eb441-2acd-5218-877f-c55fd4d78455",
+"user_state": "WI",
+"total_principal_amount": 950.00,
+"outstanding_principal_amount": 0.00,
+"repaid_principal_amount": 950.00,
+"total_fee_amount": 0.20,
+"outstanding_fee_amount": 0.00,
+"receivable_currency": "USD",
+"days_past_due": 0,
+"amount": 950.00
+}
+]
+
+Facility C — Nomina Express I (Salary Advance)
+facility_c_nomina.json (8 assets)
+[
+{
+"external_id": "NOMINA-202406-38893",
+"origination_date": "2024-05-31",
+"cutoff_date": "2026-01-15",
+"status": "active",
+"is_eligible": true,
+"employer_name": "Merlin Properties SOCIMI",
+"employer_tax_id": "ESA86648867",
+"net_monthly_salary": 3200.00,
+"advance_amount": 1800.00,
+"outstanding_amount": 900.00,
+
+Tech Challenge Instructions - Senior Product Engineering
+
+11
+
+"repaid_amount": 900.00,
+"fee_percentage": 2.5,
+"fee_amount": 45.00,
+"days_past_due": 0,
+"maturity_date": "31/01/2025",
+"amount": 1800.00
+},
+{
+"external_id": "NOMINA-202406-30379",
+"origination_date": "2024-06-27",
+"cutoff_date": "2026-01-15",
+"status": "active",
+"is_eligible": true,
+"employer_name": "BBVA S.A.",
+"employer_tax_id": "ESA48265169",
+"net_monthly_salary": 4500.00,
+"advance_amount": 2500.00,
+"outstanding_amount": 0.00,
+"repaid_amount": 2500.00,
+"fee_percentage": 2.0,
+"fee_amount": 50.00,
+"days_past_due": 0,
+"maturity_date": "31/01/2025",
+"amount": 2500.00
+},
+{
+"external_id": "NOMINA-202406-70217",
+"origination_date": "2024-06-12",
+"cutoff_date": "2026-01-15",
+"status": "past_due",
+"is_eligible": true,
+"employer_name": "Naturgy Energy S.A.",
+"employer_tax_id": "ESA08015497",
+"net_monthly_salary": 2800.00,
+"advance_amount": 1200.00,
+"outstanding_amount": 1200.00,
+
+Tech Challenge Instructions - Senior Product Engineering
+
+12
+
+"repaid_amount": 0.00,
+"fee_percentage": 3.0,
+"fee_amount": 36.00,
+"days_past_due": 35,
+"maturity_date": "31/12/2024",
+"amount": 1200.00
+},
+{
+"external_id": "NOMINA-202406-16006",
+"origination_date": "2024-06-09",
+"cutoff_date": "2026-01-15",
+"status": "ACTIVE",
+"is_eligible": true,
+"employer_name": "Naturgy Energy S.A.",
+"employer_tax_id": "ESA08015497",
+"net_monthly_salary": 3500.00,
+"advance_amount": 3000.00,
+"outstanding_amount": 1500.00,
+"repaid_amount": 1500.00,
+"fee_percentage": 2.5,
+"fee_amount": 75.00,
+"days_past_due": 0,
+"maturity_date": "28/02/2025",
+"amount": 3000.00
+},
+{
+"external_id": "NOMINA-202406-57819",
+"origination_date": "2024-06-27",
+"cutoff_date": "2026-01-15",
+"status": "active",
+"is_eligible": true,
+"employer_name": "Acciona S.A.",
+"employer_tax_id": "ESA08001851",
+"net_monthly_salary": 3800.00,
+"advance_amount": 2200.00,
+"outstanding_amount": 733.33,
+
+Tech Challenge Instructions - Senior Product Engineering
+
+13
+
+"repaid_amount": 1466.67,
+"fee_percentage": 2.0,
+"fee_amount": 44.00,
+"days_past_due": 0,
+"maturity_date": "31/03/2025",
+"amount": 2200.00
+},
+{
+"external_id": "NOMINA-202406-42087",
+"origination_date": "2024-06-21",
+"cutoff_date": "2026-01-15",
+"status": "written_off",
+"is_eligible": false,
+"employer_name": "Iberdrola S.A.",
+"employer_tax_id": "ESA48010615",
+"net_monthly_salary": 5200.00,
+"advance_amount": 4100.00,
+"outstanding_amount": 4100.00,
+"repaid_amount": 0.00,
+"fee_percentage": 2.5,
+"fee_amount": 102.50,
+"days_past_due": 150,
+"maturity_date": "31/08/2024",
+"amount": 4100.00
+},
+{
+"external_id": "NOMINA-202406-17331",
+"origination_date": "2024-06-29",
+"cutoff_date": "2026-01-15",
+"status": "active",
+"is_eligible": true,
+"employer_name": "CaixaBank S.A.",
+"employer_tax_id": "ESA08663619",
+"net_monthly_salary": 4800.00,
+"advance_amount": 1500.00,
+"outstanding_amount": 500.00,
+
+Tech Challenge Instructions - Senior Product Engineering
+
+14
+
+"repaid_amount": 1000.00,
+"fee_percentage": 1.8,
+"fee_amount": 27.00,
+"days_past_due": 0,
+"maturity_date": "28/02/2025",
+"amount": 1500.00
+},
+{
+"external_id": "NOMINA-202407-88421",
+"origination_date": "2024-07-14",
+"cutoff_date": "2026-01-15",
+"status": "settled",
+"is_eligible": false,
+"employer_name": "Telefonica S.A.",
+"employer_tax_id": "ESA28015865",
+"net_monthly_salary": 3600.00,
+"advance_amount": 2000.00,
+"outstanding_amount": 0.00,
+"repaid_amount": 2000.00,
+"fee_percentage": 2.0,
+"fee_amount": 40.00,
+"days_past_due": 0,
+"maturity_date": "31/08/2024",
+"amount": 2000.00
+}
+]
+
+Rate Calculation Specifications
+These formulas are extracted from each facility's Credit Agreement. The
+computed rate is a covenant — both the Capital Provider and the Asset Originator
+must be able to independently verify it.
+
+Facility A — Educa Capital I (ISA / Education Loans)
+Weighted Average Loan IRR — weighted by outstanding principal.
+Tech Challenge Instructions - Senior Product Engineering
+
+15
+
+Effective Rate = Σ (outstanding_amount_i × interest_rate_perc
+entage_i) / Σ (outstanding_amount_i)
+
+Eligibility Criteria — only include assets where ALL of the following hold:
+status
+
+= "open"
+
+is_eligible
+
+= true
+
+loan_status
+
+= "current"
+
+interest_rate_percentage
+
+is not null
+
+Covenant Threshold: The weighted average IRR must remain below 22.0%. If
+breached, the facility enters a Covenant Breach state and new disbursements are
+paused.
+
+Facility B — PayEarly US (Earned Wage Access)
+Portfolio Fee Yield — EWA products carry 0% interest, so the effective rate is
+derived from the fee structure relative to outstanding principal, annualized by the
+loan tenor.
+For each eligible asset:
+fee_yield_i = (total_fee_amount_i / total_principal_amount_
+i) × (365 / tenor_days_i)
+Effective Rate = Σ (outstanding_principal_amount_i × fee_yiel
+d_i) / Σ (outstanding_principal_amount_i)
+
+Where tenor_days_i = number of days between created_at and due_date .
+Eligibility Criteria — only include assets where ALL of the following hold:
+status
+
+= "performing"
+
+is_eligible
+
+= true
+
+outstanding_principal_amount
+
+>0
+
+Covenant Threshold: The annualized fee yield must remain below 3.0%. If
+breached, the facility triggers an Advance Cap Review.
+Tech Challenge Instructions - Senior Product Engineering
+
+16
+
+Facility C — Nomina Express I (Salary Advance)
+Weighted Average Annualized Advance Fee — weighted by outstanding
+principal, annualized based on the advance-to-maturity tenor.
+For each eligible asset:
+annualized_fee_i = fee_percentage_i × (12 / repayment_month
+s_i)
+Effective Rate = Σ (outstanding_amount_i × annualized_fee_i)
+/ Σ (outstanding_amount_i)
+
+Where repayment_months_i = number of months between origination_date and
+maturity_date .
+Eligibility Criteria — only include assets where ALL of the following hold:
+status
+
+= "active"
+
+is_eligible
+
+= true
+
+outstanding_amount
+
+>0
+
+Covenant Threshold: The annualized fee rate must remain below 5.0%. If
+breached, the originator must reduce the advance ratio below 50% for new
+advances.
+
+Expected Output
+For each facility, the system should produce a covenant report containing:
+1. Computed effective rate (as a percentage, 2 decimal places)
+2. Covenant status — COMPLIANT or BREACH , based on the threshold
+3. Summary: total assets evaluated, assets included, assets excluded
+4. Included assets — list of external_id s that passed all eligibility criteria
+5. Excluded assets — list of external_id s with the reason(s) for exclusion (e.g.,
+status mismatch, missing field, ineligible flag)
+
+Tech Challenge Instructions - Senior Product Engineering
+
+17
+
+Deliverables
+1. A Smart Contract to store and publish the computed interest rates
+2. A FastAPI application that exposes the necessary functionality
+3. A README describing:
+Your reasoning and assumptions
+How your design handles the variability across facilities
+How the covenant model influenced your architecture
+Trade-offs you considered
+How you would evolve the solution to production-ready
+Setup and usage instructions
+4. The full transcript of your conversations with the AI agent
+
+💡
+
+If implementing the Smart Contract becomes too time-consuming, it's
+perfectly fine to use a database instead. What matters most is the
+structure and reasoning behind your solution.
+
+Tech Challenge Instructions - Senior Product Engineering
+
+18
+
+
