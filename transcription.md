@@ -189,3 +189,75 @@
   standalone function into a `HealthHandler` class and updated the endpoint to
   instantiate the handler and return its response. Finished by rerunning Ruff
   format, Ruff check, and `ty check`, and all of them passed.
+
+## Entry 010
+- Timestamp: 2026-05-14 19:17:13 CEST
+- Type: misc
+- Status: completed
+- Human
+  lets $commit with the basic structure for the fastapi app
+
+  I added all the files, just do an initial commit
+- Agent
+  Reviewed the staged repository contents to confirm the commit scope, which
+  included the FastAPI backend scaffold, repository documentation and workflow
+  files, extracted facility datasets, and local tooling configuration. Created a
+  single initial commit with the Conventional Commits-style subject
+  `feat(repo): initialize tech challenge scaffold`, then verified the resulting
+  HEAD commit and clean working tree state.
+
+## Entry 011
+- Timestamp: 2026-05-14 19:20:46 CEST
+- Type: clean-up
+- Status: completed
+- Human
+  remove the README Maintenance from AGENTS.md this will be updated manually
+  from now on
+- Agent
+  Removed the `README Maintenance` section from `AGENTS.md` so the repository
+  instructions no longer tell the agent to keep the README synchronized
+  automatically. Left the rest of the agent guidance unchanged and recorded this
+  instruction update in the transcript.
+
+## Entry 012
+- Timestamp: 2026-05-14 19:41:42 CEST
+- Type: development
+- Status: completed
+- Human
+  Lets start creating the initial logic for the app.
+
+  * check the jsons at data in order to check the schema of the jsons
+  * Create a base schema with the common fileds found in all of them
+  * Create new schemas for each of the facilities, use the facility name, like
+    nomina, educa and payearly that uses the base class. Create a class for the
+    single entity an another for the whole list
+  * Create an instance method is_eligible that checks if its eligible following
+    the "Tech Challenge Instructions - Senior Product Engineer.txt" spec for
+    each facility
+  * Under backend/business create a folder calculator
+  * Create an abstract class BaseCalculator which will have a calculate
+    function (sync)
+  * Create 3 different calculators class for each facility which should
+    implement the calculate function using the definition at "Tech Challenge
+    Instructions - Senior Product Engineer.txt"
+  * Create 3 environment variables that define the covenant thresohold one for
+    each facility, use the default value at "Tech Challenge Instructions -
+    Senior Product Engineer.txt"
+  * Create a CovenantResult schema that defines the output schema of the
+    calculate method of the calculators use the expected output
+- Agent
+  Inspected the extracted facility JSON files and kept the shared asset base
+  intentionally narrow because the actual overlap across facilities is small:
+  `external_id`, `status`, the source eligibility flag, `days_past_due`, and
+  `amount`. Added a base facility asset schema, a covenant result schema, and
+  three facility-specific asset and portfolio schemas for Educa, PayEarly, and
+  Nomina, each with facility-specific exclusion reasoning plus an `is_eligible()`
+  method built from the challenge rules. Then created `backend/business/calculator`
+  with an abstract `BaseCalculator` and three concrete calculators implementing
+  the challenge formulas, and added threshold settings for the three covenant
+  defaults in `core/settings.py`. After the code was in place, ran Ruff and
+  `ty`, fixed the typing and import issues they found, and finally executed the
+  schemas and calculators against the extracted sample JSON files. The runtime
+  calculation pass succeeded and produced compliant results for all three sample
+  facilities with the current default thresholds: Educa `18.33`, PayEarly
+  `0.00`, and Nomina `3.39`.

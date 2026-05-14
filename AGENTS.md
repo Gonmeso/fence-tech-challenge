@@ -122,23 +122,6 @@ Guidelines:
 - Do not remove earlier entries.
 - Include cancelled interactions as explicit entries; do not silently skip them.
 
-## README Maintenance
-
-Keep `README.md` aligned with the challenge deliverables.
-
-Update it whenever the implementation changes the following:
-
-- assumptions,
-- design choices,
-- how facility variability is handled,
-- how the covenant model shaped the architecture,
-- trade-offs,
-- how the solution should evolve toward production,
-- setup and usage.
-
-The user may later refine the reasoning text, but the structure and technical facts
-should remain current.
-
 ## Working Style
 
 - Prefer concrete implementation over speculative abstraction.
