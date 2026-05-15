@@ -5,6 +5,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    """Runtime configuration loaded from environment variables."""
+
     app_name: str = "Fence Tech Challenge Backend"
     environment: str = "local"
     api_v1_prefix: str = "/api/v1"
@@ -22,4 +24,10 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
+    """Return a cached settings instance for the current process.
+
+    Returns:
+        Settings: Cached application settings.
+    """
+
     return Settings()

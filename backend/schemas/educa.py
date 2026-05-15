@@ -7,6 +7,8 @@ from schemas.base import BaseFacilityAsset
 
 
 class EducaAsset(BaseFacilityAsset):
+    """One Educa asset row as provided by the source data."""
+
     effective_date: date
     reporting_date: date
     student_id: str
@@ -19,6 +21,12 @@ class EducaAsset(BaseFacilityAsset):
     country: str
 
     def get_exclusion_reasons(self) -> list[str]:
+        """Return all Educa-specific reasons the asset is excluded.
+
+        Returns:
+            list[str]: Exclusion reasons collected for the asset.
+        """
+
         reasons: list[str] = []
 
         if self.status.casefold() != "open":
@@ -34,6 +42,14 @@ class EducaAsset(BaseFacilityAsset):
 
 
 class EducaPortfolio(RootModel[list[EducaAsset]]):
+    """Wrapper used to validate lists of Educa assets."""
+
     @property
     def assets(self) -> list[EducaAsset]:
+        """Expose the wrapped asset list with a stable name.
+
+        Returns:
+            list[EducaAsset]: Validated Educa assets.
+        """
+
         return self.root

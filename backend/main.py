@@ -25,6 +25,15 @@ configure_logging(settings.log_level)
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    """Log application startup and shutdown events.
+
+    Args:
+        _: FastAPI application instance managed by FastAPI.
+
+    Yields:
+        None: Control back to FastAPI while the application is running.
+    """
+
     logger.info(
         "Starting {app_name} in {environment} mode",
         app_name=settings.app_name,
@@ -42,8 +51,18 @@ app = FastAPI(
 app.include_router(api_router, prefix=settings.api_v1_prefix)
 
 
-# TODO: This should be refactored, we should have specific HTTP errors, then spcefic domain errors, which then can be mappe to the HTTP errors. This way we can have more specific error handling and avoid having to catch all errors in the same way. We can also have a more specific error response model for each type of error, which can include additional fields that are relevant for that type of error.
+# TODO: Split domain errors from HTTP mapping as the error model grows.
 def build_error_response(error: FenceAppError, status_code: int) -> JSONResponse:
+    """Convert a domain error into the shared API error payload.
+
+    Args:
+        error: Application error to expose through the API.
+        status_code: HTTP status code to return with the payload.
+
+    Returns:
+        JSONResponse: Serialized API error response.
+    """
+
     return JSONResponse(
         status_code=status_code,
         content=ErrorResponse(
@@ -59,6 +78,16 @@ async def handle_missing_facility_header(
     _: Request,
     exc: MissingFacilityHeaderError,
 ) -> JSONResponse:
+    """Handle requests that do not declare a facility header.
+
+    Args:
+        _: Incoming FastAPI request.
+        exc: Raised application error.
+
+    Returns:
+        JSONResponse: HTTP 400 error response.
+    """
+
     return build_error_response(exc, 400)
 
 
@@ -67,6 +96,16 @@ async def handle_invalid_facility_header(
     _: Request,
     exc: InvalidFacilityHeaderError,
 ) -> JSONResponse:
+    """Handle requests with an invalid facility header.
+
+    Args:
+        _: Incoming FastAPI request.
+        exc: Raised application error.
+
+    Returns:
+        JSONResponse: HTTP 400 error response.
+    """
+
     return build_error_response(exc, 400)
 
 
@@ -75,6 +114,16 @@ async def handle_invalid_json_payload(
     _: Request,
     exc: InvalidJsonPayloadError,
 ) -> JSONResponse:
+    """Handle requests with malformed JSON bodies.
+
+    Args:
+        _: Incoming FastAPI request.
+        exc: Raised application error.
+
+    Returns:
+        JSONResponse: HTTP 400 error response.
+    """
+
     return build_error_response(exc, 400)
 
 
@@ -83,6 +132,16 @@ async def handle_invalid_payload_type(
     _: Request,
     exc: InvalidPayloadTypeError,
 ) -> JSONResponse:
+    """Handle requests whose payload is not a JSON array.
+
+    Args:
+        _: Incoming FastAPI request.
+        exc: Raised application error.
+
+    Returns:
+        JSONResponse: HTTP 400 error response.
+    """
+
     return build_error_response(exc, 400)
 
 
@@ -91,6 +150,16 @@ async def handle_unsupported_facility(
     _: Request,
     exc: UnsupportedFacilityError,
 ) -> JSONResponse:
+    """Handle requests for unsupported facilities.
+
+    Args:
+        _: Incoming FastAPI request.
+        exc: Raised application error.
+
+    Returns:
+        JSONResponse: HTTP 400 error response.
+    """
+
     return build_error_response(exc, 400)
 
 
@@ -99,6 +168,16 @@ async def handle_facility_payload_validation(
     _: Request,
     exc: FacilityPayloadValidationError,
 ) -> JSONResponse:
+    """Handle payloads that fail facility schema validation.
+
+    Args:
+        _: Incoming FastAPI request.
+        exc: Raised application error.
+
+    Returns:
+        JSONResponse: HTTP 422 error response.
+    """
+
     return build_error_response(exc, 422)
 
 
@@ -107,11 +186,27 @@ async def handle_calculator_execution(
     _: Request,
     exc: CalculatorExecutionError,
 ) -> JSONResponse:
+    """Handle unexpected calculator execution failures.
+
+    Args:
+        _: Incoming FastAPI request.
+        exc: Raised application error.
+
+    Returns:
+        JSONResponse: HTTP 500 error response.
+    """
+
     return build_error_response(exc, 500)
 
 
 @app.get("/", tags=["meta"])
 async def root() -> dict[str, str]:
+    """Return a small metadata payload for local sanity checks.
+
+    Returns:
+        dict[str, str]: Application status and docs link.
+    """
+
     return {
         "message": f"{settings.app_name} is running",
         "docs_url": "/docs",

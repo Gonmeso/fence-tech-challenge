@@ -39,3 +39,5 @@ cache/
 out/
 broadcast/
 
+# Misc
+sessions.txt

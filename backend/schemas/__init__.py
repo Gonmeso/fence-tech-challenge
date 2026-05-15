@@ -1,5 +1,3 @@
-"""Pydantic schemas."""
-
 from schemas.base import BaseFacilityAsset
 from schemas.covenant import CovenantResult, CovenantStatus, CovenantSummary, ExcludedAsset
 from schemas.educa import EducaAsset, EducaPortfolio

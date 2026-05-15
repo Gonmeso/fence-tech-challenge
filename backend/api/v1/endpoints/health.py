@@ -9,4 +9,10 @@ router = APIRouter()
 
 @router.get("", response_model=HealthResponse)
 async def healthcheck() -> HealthResponse:
+    """Return a small health payload for uptime checks.
+
+    Returns:
+        HealthResponse: Current application health information.
+    """
+
     return HealthHandler(get_settings()).get_health()

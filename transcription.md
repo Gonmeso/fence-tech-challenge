@@ -596,3 +596,160 @@ session responses, rather than reduced to short summaries.
   The transcription is missing full outputs from the agent and its missing interactiosn
 - Agent
   Repaired the transcript gap by updating both transcript files together. The fix restored the missing later interactions, expanded compressed agent-side entries where they were too summary-like, and synchronized `transcription.md` back to the fuller session style rather than the abbreviated version.
+
+## Entry 028
+- Timestamp: 2026-05-15 19:06:24 CEST
+- Type: clean-up
+- Status: completed
+- Human
+  $commit
+
+  continue
+- Agent
+  Checked the workspace state and the repository commit instructions, reviewed the pending diff, and created a focused commit for the only tracked change left in the working tree.
+
+  The resulting commit was:
+  `fix(api): register covenant error handlers`
+
+  Commit:
+  `52aec2656a3ea438e7e012cb515c8c5d4169c8b5`
+
+  After the commit, the code changes were clean. A follow-up transcript-only update was then appended to `transcription.md` to keep the rolling interaction log current with this commit request and response.
+
+## Entry 029
+- Timestamp: 2026-05-15 19:10:00 CEST
+- Type: clean-up
+- Status: cancelled
+- Human
+  We are missing docstrings and comments that will be useful for humans an agents. Please add docstrings following the Google styling for them, explicit better than clever and short better than long. Then commit
+- Agent
+  Started by auditing the backend production modules for missing documentation, with focus on the API dependency layer, endpoint modules, calculator stack, handlers, settings, logging, exceptions, and facility schemas. I then patched those files with short Google-style module, class, and function docstrings, and added a few targeted comments where the business formulas or logging bridge were not self-evident from the code alone.
+
+  The commit step was not reached because the turn was interrupted by a follow-up instruction before completion.
+
+## Entry 030
+- Timestamp: 2026-05-15 19:12:29 CEST
+- Type: misc
+- Status: completed
+- Human
+  Font commit finally as i want to review
+- Agent
+  I did not commit. The docstring and comment pass is left in the working tree for review, and both `rtk uv run ruff check .` and `rtk uv run ty check .` passed in `backend`.
+
+  The current tracked changes are the backend production modules touched by the documentation pass plus this transcript update. The untracked `sessions.txt` file was left untouched.
+
+## Entry 031
+- Timestamp: 2026-05-15 19:20:02 CEST
+- Type: clean-up
+- Status: completed
+- Human
+  Remove top level comment on the files and documment arguments to the functions. What it does, ARGS:... Raises:... Returns:...
+- Agent
+  Removed the file-level docstrings from the backend modules and package `__init__` files touched by the previous pass, then rewrote the function and method docstrings to the fuller Google-style structure you requested: short summary plus `Args`, `Returns`, and `Raises` where relevant.
+
+  I also shortened an old TODO comment in `backend/main.py` because it caused the only `ruff` failure after the docstring rewrite. Final verification passed with `rtk uv run ruff check .` and `rtk uv run ty check .` in `backend`.
+
+## Entry 032
+- Timestamp: 2026-05-15 19:23:48 CEST
+- Type: clean-up
+- Status: completed
+- Human
+  raises goes before returns, my bad
+- Agent
+  Reordered the affected Google-style docstrings so `Raises` now appears before `Returns` anywhere both sections are present. This only required a narrow patch in the dependency layer, dispatcher, covenant handler, and Nomina date parser.
+
+  Verification passed again with `rtk uv run ruff check .` and `rtk uv run ty check .` in `backend`.
+
+## Entry 033
+- Timestamp: 2026-05-15 19:27:00 CEST
+- Type: clean-up
+- Status: cancelled
+- Human
+  Lets commit the changes
+- Agent
+  Started a commit review by checking the workspace state, pending diff, and recent commit subjects so the documentation changes could be staged cleanly. During that review I found one extra tracked change in `.gitignore` and began inspecting whether it belonged in the same commit.
+
+  The commit was not created because the turn was redirected by the next user request before staging or committing.
+
+## Entry 034
+- Timestamp: 2026-05-15 19:31:58 CEST
+- Type: development
+- Status: completed
+- Human
+  Create a script to run locally the api with uvicorn
+- Agent
+  Added [scripts/run_local_api.sh](/Users/gonmeso/src/personal/fence-tech-challenge/scripts/run_local_api.sh:1) as a small local launcher for the FastAPI app. The script changes into `backend`, reads optional `HOST` and `PORT` environment variables, and runs `uv run uvicorn main:app --host "$HOST" --port "$PORT" --reload --loop uvloop`, forwarding any extra CLI arguments to uvicorn.
+
+  I also made the script executable. Verification of the exact `uv run` startup path required one run outside the sandbox because the sandbox blocked `uv` from opening its cache; the launcher then successfully returned the `uvicorn --help` output with the expected defaults.
+
+## Entry 035
+- Timestamp: 2026-05-15 19:32:47 CEST
+- Type: development
+- Status: completed
+- Human
+  Lets start with the smart contract creation, this is stated at "Tech Challenge Instructions - Senior Product Engineer.txt"
+
+    The smart contract should handle this input:
+
+    1. Computed effective rate (as a percentage, 2 decimal places)
+    2. Covenant status — COMPLIANT or BREACH , based on the threshold
+    3. Summary: total assets evaluated, assets included, assets excluded
+    4. Included assets — list of external_id s that passed all eligibility criteria
+    5. Excluded assets — list of external_id s with the reason(s) for exclusion (e.g.,
+    status mismatch, missing field, ineligible flag)
+
+    This means that we need to storage this input for multiple facilities, so the function should have an input of the facility,
+    check backend/business/enums.py for the names that can be used as input.
+
+    The input should only be change by a whitelisted set of addresses, for now make that "*" allows for any as is for testing
+    purposes but this should be in place so anyone can make the change.
+
+    Use foundry tools to check the deployment and usage.
+
+    - A wallet should be able to update the output for a facility (this should only be allowed to whitelisted wallets)
+    - Deployment is sucessful
+    - Calling the read function will return the real value
+    - Create tests
+
+
+  Lets start creating a plan for this, prompt questions for things that might be missing and add recommendations as well
+- Agent
+  Reviewed the challenge text, the backend facility enum, the existing covenant result schema, the recent git history, and the local Foundry toolchain before proposing a plan. The planning pass concluded that the backend already solves the calculation side and the contract should only store and publish the result, keyed by the existing facility names `educa`, `payearly`, and `nomina`.
+
+  The proposed plan was a small-scope Foundry implementation: one `FacilityCovenantRegistry` contract under `smart-contract/`, one deployment script, and one test suite. The recommended shape was one latest full report per facility, external string facility names hashed internally for lookup, basis-point storage for the effective rate, explicit access control with `openWrite = true` by default for testing plus a real allowlist path, and full-report replacement on update. I also called out that on-chain calculation, upgradeability, multi-sig governance, and historical snapshot storage were not in scope for the first pass.
+
+  The planning output included an ASCII data-flow diagram, a concrete test matrix, failure modes, and seven explicit decision points. The recommendations were to keep facility input human-readable, store only the latest report with history in events, require exact lowercase facility names, use an existence flag on reads, and represent excluded-asset reasons as `string[]` unless the user preferred a smaller shape.
+
+## Entry 036
+- Timestamp: 2026-05-15 19:32:47 CEST
+- Type: development
+- Status: completed
+- Human
+  - Calculation is done in python this is just to store the result
+  - lets add all the recommendations proposed but the reasons one, we wont store the reasons here
+
+  Add it to the plan
+- Agent
+  Updated the plan to make the storage boundary explicit: Python computes the covenant result and Solidity only stores and publishes it. The plan was narrowed so the contract would store excluded asset IDs without exclusion reasons, while keeping the other recommended decisions intact.
+
+  The revised plan called for a single registry contract keyed by supported facility strings, basis-point storage for the effective rate, summary counts, included external IDs, excluded external IDs, latest-snapshot replacement semantics, an allowlist path with `openWrite = true` for testing, a deployment script, Foundry tests, local `anvil` deployment verification, and a README update documenting that exclusion reasons remain off-chain for now.
+
+## Entry 037
+- Timestamp: 2026-05-15 19:32:47 CEST
+- Type: development
+- Status: completed
+- Human
+  Start the implementation
+- Agent
+  Implemented the first smart-contract layer under [smart-contract](</Users/gonmeso/src/personal/fence-tech-challenge/smart-contract>) using Foundry. The default counter example was replaced with [FacilityCovenantRegistry.sol](/Users/gonmeso/src/personal/fence-tech-challenge/smart-contract/src/FacilityCovenantRegistry.sol:1), which stores one latest covenant snapshot per supported facility (`educa`, `payearly`, `nomina`). The stored report includes the facility name, effective rate in basis points, covenant status, total/included/excluded counts, included external IDs, excluded external IDs, update timestamp, updating wallet, and an existence flag.
+
+  The contract also includes a testing-friendly write gate: `openWrite` is enabled by default, the deployer is the owner, the owner can toggle open mode, and the owner can manage a writer allowlist for restricted mode. Unsupported facilities revert, and updates also revert when the declared `totalAssetsEvaluated` does not equal `included + excluded`.
+
+  I added [FacilityCovenantRegistry.t.sol](/Users/gonmeso/src/personal/fence-tech-challenge/smart-contract/test/FacilityCovenantRegistry.t.sol:1) with coverage for deployment defaults, open-write updates, restricted-mode rejection, restricted-mode allowlist success, overwrite behavior, pre-publication existence checks, summary-count mismatch reverts, and unsupported facility reverts. I also added [Deploy.s.sol](/Users/gonmeso/src/personal/fence-tech-challenge/smart-contract/script/Deploy.s.sol:1) and rewrote the Foundry README in [smart-contract/README.md](/Users/gonmeso/src/personal/fence-tech-challenge/smart-contract/README.md:1) to describe the real contract instead of the default example.
+
+  Verification passed locally with `rtk forge build` and `rtk forge test` in `smart-contract` with 8 tests passing. I then started `anvil`, deployed the contract with `rtk forge script script/Deploy.s.sol:DeployFacilityCovenantRegistry --rpc-url http://127.0.0.1:8545 --broadcast`, published an Educa report using `rtk cast send`, and confirmed the stored on-chain value with sequential `rtk cast call` reads:
+
+  - `reportExists("educa")` returned `true`
+  - `getFacilityReport("educa")` returned `("educa", 527, 1, 3, 2, 1, ["asset-001", "asset-002"], ["asset-003"], ..., 0x70997970C51812dc3A010C7d01b50e0d17dc79C8, true)`
+
+  I also updated [README.md](/Users/gonmeso/src/personal/fence-tech-challenge/README.md:1) so the repository-level documentation now reflects the smart-contract implementation, the Python-versus-Solidity responsibility split, and the current tradeoff of keeping exclusion reasons off-chain.

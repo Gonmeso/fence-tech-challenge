@@ -6,9 +6,22 @@ from schemas.educa import EducaPortfolio
 
 
 class EducaCalculator(BaseCalculator[EducaPortfolio]):
+    """Calculate the effective rate for Educa portfolios."""
+
     def calculate(self, portfolio: EducaPortfolio) -> CovenantResult:
+        """Calculate the weighted average interest rate for eligible assets.
+
+        Args:
+            portfolio: Validated Educa portfolio.
+
+        Returns:
+            CovenantResult: Covenant output for the Educa portfolio.
+        """
+
         assets = portfolio.assets
         included_assets = [asset for asset in assets if asset.is_eligible()]
+        # Educa already carries a direct interest rate per asset, so the
+        # facility covenant is a weighted average by outstanding amount.
         numerator = sum(
             asset.outstanding_amount * asset.interest_rate_percentage
             for asset in included_assets

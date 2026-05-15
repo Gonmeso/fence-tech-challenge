@@ -10,6 +10,19 @@ from core.settings import get_settings
 def get_facility_type_header(
     x_fence_facility_type: str | None = Header(default=None),
 ) -> FacilityType:
+    """Parse and validate the facility type header.
+
+    Args:
+        x_fence_facility_type: Raw facility header value from the request.
+
+    Raises:
+        MissingFacilityHeaderError: If the header is not provided.
+        InvalidFacilityHeaderError: If the header does not map to a facility.
+
+    Returns:
+        FacilityType: Parsed facility enum value.
+    """
+
     if x_fence_facility_type is None:
         raise MissingFacilityHeaderError()
 
@@ -22,8 +35,20 @@ def get_facility_type_header(
 
 
 def get_calculator_dispatcher() -> CalculatorDispatcher:
+    """Build a calculator dispatcher with the current settings.
+
+    Returns:
+        CalculatorDispatcher: Dispatcher configured with current thresholds.
+    """
+
     return CalculatorDispatcher(get_settings())
 
 
 def get_covenant_handler() -> CovenantHandler:
+    """Build the covenant handler used by calculation endpoints.
+
+    Returns:
+        CovenantHandler: Handler wired with a calculator dispatcher.
+    """
+
     return CovenantHandler(get_calculator_dispatcher())

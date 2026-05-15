@@ -25,6 +25,17 @@ async def calculate_covenant(
     facility_type: Annotated[FacilityType, Depends(get_facility_type_header)],
     covenant_handler: Annotated[CovenantHandler, Depends(get_covenant_handler)],
 ) -> CovenantResult:
+    """Calculate the covenant result for the declared facility payload.
+
+    Args:
+        request: Incoming HTTP request containing the raw payload body.
+        facility_type: Facility declared through the request header.
+        covenant_handler: Business handler that performs the calculation.
+
+    Returns:
+        CovenantResult: Calculated covenant response for the payload.
+    """
+
     return covenant_handler.calculate(
         facility_type=facility_type,
         payload=await request.body(),

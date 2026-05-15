@@ -7,6 +7,8 @@ from schemas.base import BaseFacilityAsset
 
 
 class PayearlyAsset(BaseFacilityAsset):
+    """One Payearly asset row as provided by the source data."""
+
     created_at: datetime
     due_date: date
     last_updated: datetime
@@ -22,9 +24,21 @@ class PayearlyAsset(BaseFacilityAsset):
     receivable_currency: str
 
     def tenor_days(self) -> int:
+        """Return the asset tenor in days.
+
+        Returns:
+            int: Number of days between creation and due date.
+        """
+
         return (self.due_date - self.created_at.date()).days
 
     def get_exclusion_reasons(self) -> list[str]:
+        """Return all Payearly-specific reasons the asset is excluded.
+
+        Returns:
+            list[str]: Exclusion reasons collected for the asset.
+        """
+
         reasons: list[str] = []
 
         if self.status.casefold() != "performing":
@@ -42,6 +56,14 @@ class PayearlyAsset(BaseFacilityAsset):
 
 
 class PayearlyPortfolio(RootModel[list[PayearlyAsset]]):
+    """Wrapper used to validate lists of Payearly assets."""
+
     @property
     def assets(self) -> list[PayearlyAsset]:
+        """Expose the wrapped asset list with a stable name.
+
+        Returns:
+            list[PayearlyAsset]: Validated Payearly assets.
+        """
+
         return self.root
