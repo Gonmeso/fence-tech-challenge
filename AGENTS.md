@@ -93,9 +93,9 @@ Use this format in `transcription.md`:
 - Type: development
 - Status: completed
 - Human
-  <exact or near-exact user message>
+  <full user input>
 - Agent
-  <slightly verbose but faithful agent response summarizing intent, work, and outcome>
+  <full agent output>
 ```
 
 Prompt `Type` must be one of:
@@ -112,12 +112,11 @@ was interrupted, cancelled, or aborted, record it explicitly as `cancelled` or
 
 Guidelines:
 
-- Preserve meaning exactly when possible.
-- The agent section should be more descriptive than a one-line acknowledgment. It
-  should summarize what the agent understood, what it inspected or changed, and
-  any relevant outcome or limitation.
-- If the agent response is long, summarize faithfully rather than dumping noisy
-  tool output.
+- Preserve the full user input and the full user-facing agent output whenever
+  practical.
+- Prefer verbatim transcript content over summaries.
+- Only summarize when the original output is unavailable or would include noisy
+  low-signal tool output that was never shown to the user.
 - Keep entries chronological.
 - Do not remove earlier entries.
 - Include cancelled interactions as explicit entries; do not silently skip them.
