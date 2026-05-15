@@ -753,3 +753,35 @@ session responses, rather than reduced to short summaries.
   - `getFacilityReport("educa")` returned `("educa", 527, 1, 3, 2, 1, ["asset-001", "asset-002"], ["asset-003"], ..., 0x70997970C51812dc3A010C7d01b50e0d17dc79C8, true)`
 
   I also updated [README.md](/Users/gonmeso/src/personal/fence-tech-challenge/README.md:1) so the repository-level documentation now reflects the smart-contract implementation, the Python-versus-Solidity responsibility split, and the current tradeoff of keeping exclusion reasons off-chain.
+
+## Entry 036
+- Timestamp: 2026-05-15 19:35:07 CEST
+- Type: clean-up
+- Status: completed
+- Human
+  Create a commit for the already staged changes
+- Agent
+  Reviewed the staged set and confirmed it included the backend documentation pass, the local API launcher script, `.gitignore` updates for `sessions.txt`, and the transcript changes that were already staged. I then created a commit from exactly that staged snapshot without touching the separate unstaged `README.md` change or the untracked `smart-contract/` directory.
+
+  The resulting commit was:
+  `chore(backend): document services and add local API runner`
+
+  Commit:
+  `769a064bbc86dbd22f2bdd95cef7e435986b8263`
+
+## Entry 038
+- Timestamp: 2026-05-15 19:40:28 CEST
+- Type: clean-up
+- Status: completed
+- Human
+  Lets use dubmodelues for this and add instructions in the readme
+- Agent
+  Reworked the Foundry dependency layout so `smart-contract/lib/forge-std` is now a real git submodule instead of a vendored directory. This added [`.gitmodules`](/Users/gonmeso/src/personal/fence-tech-challenge/.gitmodules:1) with the `smart-contract/lib/forge-std` entry pointing at `https://github.com/foundry-rs/forge-std`, and the repository now records `forge-std` as a pinned gitlink rather than a copied tree.
+
+  I also updated the setup docs in both [README.md](/Users/gonmeso/src/personal/fence-tech-challenge/README.md:1) and [smart-contract/README.md](/Users/gonmeso/src/personal/fence-tech-challenge/smart-contract/README.md:1) so they explicitly document cloning with `--recurse-submodules` and recovering an existing clone with `git submodule update --init --recursive`.
+
+  Verification still passed after the dependency change:
+  - `rtk forge build`
+  - `rtk forge test`
+
+  The smart-contract test suite remained green with 8 passing tests under the submodule-backed setup.
