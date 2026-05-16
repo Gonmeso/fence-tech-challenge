@@ -108,6 +108,17 @@ If the repository is already cloned, initialize the Foundry dependency:
 git submodule update --init --recursive
 ```
 
+Quickstart the development environment:
+
+```bash
+./scripts/quickstart_dev.sh
+```
+
+The quickstart script checks whether `uv`, `forge`, `cast`, and `anvil` are
+available. If `uv` or Foundry is missing, it asks before running the official
+installer. It then updates submodules, creates the backend virtual environment,
+installs dependencies, installs pre-commit hooks, and builds the smart contract.
+
 Smart-contract bootstrap:
 
 ```bash
@@ -130,7 +141,31 @@ uv run --project backend pre-commit install
 
 ## Usage
 
-Run the backend locally:
+Run the full repository with Docker:
+
+```bash
+cp .env.example .env
+docker compose up --build
+```
+
+If your Docker installation uses the legacy Compose binary:
+
+```bash
+docker-compose up --build
+```
+
+The Docker stack starts two services:
+
+- `smart-contract`: starts Anvil, deploys `FacilityCovenantRegistry`, and only
+  becomes healthy after contract code exists at the deterministic registry
+  address.
+- `backend`: starts the FastAPI API and only becomes healthy after it can serve
+  `/api/v1/health` and make an `eth_chainId` RPC request to the local chain.
+
+The `.env` values are local-only Anvil defaults. Do not reuse them outside local
+development.
+
+Run only the backend locally:
 
 ```bash
 ./scripts/run_local_api.sh

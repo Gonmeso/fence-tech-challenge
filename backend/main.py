@@ -6,6 +6,7 @@ from loguru import logger
 
 from api.v1.router import api_router
 from core.clients.contract_abi import load_registry_abi
+from core.clients.rpc import check_rpc_connection
 from core.exceptions import (
     CalculatorExecutionError,
     CovenantPublicationError,
@@ -45,6 +46,12 @@ async def lifespan(_: FastAPI):
         environment=settings.environment,
     )
     load_registry_abi(settings.covenant_registry_abi_path)
+    chain_id = check_rpc_connection(settings.web3_rpc_url)
+    logger.info(
+        "Connected to RPC {rpc_url} with chain id {chain_id}",
+        rpc_url=settings.web3_rpc_url,
+        chain_id=chain_id,
+    )
     yield
     logger.info("Stopping {app_name}", app_name=settings.app_name)
 

@@ -872,3 +872,97 @@ session responses, rather than reduced to short summaries.
   Reviewed the pending changes for the smart-contract publication and retrieval implementation. The diff included the backend async registry client, ABI loader and checked-in ABI, handler/API/schema updates, contract error handling, fake and real e2e tests, local stack and curl helper scripts, README usage updates, and transcript entries.
 
   I staged that implementation set and created a focused commit for the publishing and retrieval flow.
+
+## Entry 044
+- Timestamp: 2026-05-16 13:24:35 CEST
+- Type: misc
+- Status: completed
+- Human
+  Lets now create an easy way to start this repository, for this we will use docker:
+
+  * Create a dockerfile for the backend using python-slim and that it starts the API and checks that it can succesfully do an RPC request (readiness check)
+  * Create a dockerfile for the smart contract that will use forge to locally deploy the testnet and deploy the smart contract, api depends on this
+  * Create a docker compose file to orchestrate both services
+  * Create a .env to satisfy the secrets needed
+
+  gice me the plan
+- Agent
+  Planned the Docker setup without creating files yet. The recommended approach is to use a backend `python:3.12-slim` image with `uv`, a Foundry-based smart-contract image that starts Anvil and deploys `FacilityCovenantRegistry`, and a Compose file where the backend depends on the smart-contract service healthcheck. The smart-contract service should use deterministic local-chain settings so `.env` can provide the expected registry address to the backend instead of requiring dynamic environment mutation between containers.
+
+  The implementation plan is to add a backend Dockerfile, a smart-contract Dockerfile and entrypoint script, a Compose file, a committed local `.env` template for non-production Anvil secrets, healthchecks for RPC and deployment readiness, and README instructions for starting the full stack with Docker.
+
+## Entry 045
+- Timestamp: 2026-05-16 13:32:46 CEST
+- Type: development
+- Status: completed
+- Human
+  Implement the solutin
+- Agent
+  Implemented the Docker startup path for the repository. Added a backend Dockerfile based on `python:3.12-slim`, with `uv sync --frozen --no-dev`, API startup through `uvicorn`, and a Python readiness script that checks both `/api/v1/health` and a JSON-RPC `eth_chainId` request to `FENCE_WEB3_RPC_URL`.
+
+  Added a smart-contract Dockerfile based on the Foundry image plus a `docker-entrypoint.sh` that starts Anvil, waits for RPC readiness, deploys `FacilityCovenantRegistry`, waits until code exists at the deterministic local registry address, and then keeps Anvil running. Added `docker-compose.yml` to orchestrate `smart-contract` and `backend`, with the backend depending on the smart-contract service healthcheck.
+
+  Added a local `.env` with Anvil-only settings, a tracked `.env.example` with the same local defaults, `.dockerignore` files for both build contexts, and README instructions for `docker compose up --build` and legacy `docker-compose up --build`.
+
+  Verification passed for `docker-compose config`, `rtk uv run ruff check .`, `rtk uv run ty check .`, Python syntax for the readiness script, and shell syntax for the smart-contract entrypoint. A real `docker-compose build` could not run because the Docker daemon was not reachable at `unix:///var/run/docker.sock`.
+
+## Entry 046
+- Timestamp: 2026-05-16 13:37:52 CEST
+- Type: development
+- Status: completed
+- Human
+  I restarted colima, lets resume the task
+- Agent
+  Resumed Docker validation against the running Colima daemon. The sandbox initially blocked access to the Colima Docker socket, so I reran the Docker commands outside the sandbox with approval.
+
+  The first `docker-compose build` surfaced a smart-contract image issue: the Foundry base image did not allow `chmod` in `/usr/local/bin`. I fixed this by copying the entrypoint into `/app` and invoking it with `sh`. The next build succeeded for both services.
+
+  After starting the stack with `docker-compose up -d --build`, both containers became healthy. I also noticed the backend container was using `uv run` at runtime and syncing dev dependencies, so I changed the backend Docker command and healthcheck to use `.venv/bin/uvicorn` and `.venv/bin/python` directly. Rebuilding and restarting confirmed the backend starts cleanly without runtime dependency sync.
+
+  Final Docker smoke verification passed:
+  - `docker-compose build`
+  - `docker-compose up -d --build`
+  - `docker-compose ps` showed `backend` and `smart-contract` healthy
+  - `docker-compose config`
+  - `./scripts/curl_covenant_samples.sh`
+
+  The sample curl script successfully checked health, published covenant results for Educa, PayEarly, and Nomina, and read each result back from the on-chain endpoint.
+
+## Entry 047
+- Timestamp: 2026-05-16 13:45:17 CEST
+- Type: development
+- Status: completed
+- Human
+  Lets improve a couple of things:
+
+  * Readiness check should be done at the fastapi api level, that means that it should be done at start up
+  * Create one script to quickstart the dev envinment. After git cloning with submodules, install uv, foundry (both asking for permission and checking if they exist beforehand), update submodules, create venv, install dependencies, pre-commit
+- Agent
+  Moved the RPC readiness check into the FastAPI startup lifecycle. Startup now loads the checked-in registry ABI, calls `eth_chainId` against the configured RPC URL, and logs the connected chain id before the app reports startup complete. The Docker healthcheck now only checks the API health endpoint because RPC readiness is enforced before the API starts.
+
+  Added `scripts/quickstart_dev.sh` as a single development bootstrap script. It checks for `uv`, `forge`, `cast`, and `anvil`; asks for confirmation before installing missing `uv` through the official installer or Foundry through `foundryup`; updates git submodules; runs `uv sync --project backend`; installs pre-commit hooks; and builds the smart contract.
+
+  Updated the README setup section to point new contributors to the quickstart script after cloning with submodules, while keeping manual setup commands available.
+
+  Verification passed:
+  - `bash -n scripts/quickstart_dev.sh`
+  - `bash -n smart-contract/docker-entrypoint.sh`
+  - Python syntax checks for the new RPC helper, readiness script, and app startup
+  - `rtk uv run ruff check .`
+  - `rtk uv run ty check .`
+  - `docker-compose config`
+  - `docker-compose up -d --build`
+  - `docker-compose ps`
+  - `./scripts/curl_covenant_samples.sh`
+  - `rtk uv run pytest`
+
+  The Docker logs showed FastAPI startup connecting to `http://smart-contract:8545` and logging chain id `31337`. The backend test run reported 51 passing tests with one dependency deprecation warning from `websockets.legacy`.
+
+## Entry 048
+- Timestamp: 2026-05-16 13:50:27 CEST
+- Type: clean-up
+- Status: completed
+- Human
+  lets commit the changes
+- Agent
+  Used the commit workflow to review the staged Docker, readiness, quickstart, README, and transcript changes. Added the current transcript entry and created a focused Conventional Commits-style commit for the local development startup improvements.

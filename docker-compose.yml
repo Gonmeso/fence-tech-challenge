@@ -1,0 +1,41 @@
+services:
+  smart-contract:
+    build:
+      context: ./smart-contract
+    env_file:
+      - .env
+    environment:
+      ANVIL_HOST: 0.0.0.0
+      ANVIL_PORT: 8545
+      ANVIL_CHAIN_ID: ${FENCE_WEB3_CHAIN_ID:-31337}
+      CONTRACT_ADDRESS: ${FENCE_COVENANT_REGISTRY_ADDRESS:-0x5FbDB2315678afecb367f032d93F642f64180aa3}
+      PRIVATE_KEY: ${FENCE_COVENANT_REGISTRY_PRIVATE_KEY}
+    ports:
+      - "8545:8545"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "cast code \"$${CONTRACT_ADDRESS}\" --rpc-url http://127.0.0.1:8545 | grep -vq '^0x$'",
+        ]
+      interval: 5s
+      timeout: 5s
+      start_period: 10s
+      retries: 30
+
+  backend:
+    build:
+      context: ./backend
+    env_file:
+      - .env
+    depends_on:
+      smart-contract:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", ".venv/bin/python", "scripts/readiness_check.py"]
+      interval: 10s
+      timeout: 5s
+      start_period: 15s
+      retries: 12
