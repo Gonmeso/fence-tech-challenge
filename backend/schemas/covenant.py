@@ -33,3 +33,34 @@ class CovenantResult(BaseModel):
     summary: CovenantSummary
     included_assets: list[str]
     excluded_assets: list[ExcludedAsset]
+
+
+class CovenantPublication(BaseModel):
+    """Metadata for a covenant report published on-chain."""
+
+    chain_id: int
+    contract_address: str
+    transaction_hash: str
+
+
+class CovenantPublishedResult(CovenantResult):
+    """Covenant calculation response with publication metadata."""
+
+    publication: CovenantPublication
+
+
+class OnChainCovenantResult(BaseModel):
+    """Latest covenant report read from the smart contract."""
+
+    facility: str
+    effective_rate_bps: int
+    computed_effective_rate: float
+    covenant_status: CovenantStatus
+    summary: CovenantSummary
+    included_assets: list[str]
+    excluded_assets: list[str]
+    updated_at: int
+    updated_by: str
+    exists: bool
+    chain_id: int
+    contract_address: str

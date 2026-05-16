@@ -133,9 +133,21 @@ uv run --project backend pre-commit install
 Run the backend locally:
 
 ```bash
-cd backend
-uv run uvicorn main:app --reload --loop uvloop
+./scripts/run_local_api.sh
 ```
+
+Run the full local stack with Anvil, contract deployment, and the API:
+
+```bash
+./scripts/run_local_stack.sh
+```
+
+The stack script exports these backend settings after deployment:
+
+- `FENCE_WEB3_RPC_URL`
+- `FENCE_WEB3_CHAIN_ID`
+- `FENCE_COVENANT_REGISTRY_ADDRESS`
+- `FENCE_COVENANT_REGISTRY_PRIVATE_KEY`
 
 Run smart-contract tests locally:
 
@@ -156,6 +168,40 @@ cd smart-contract
 PRIVATE_KEY=<anvil_private_key> forge script script/Deploy.s.sol:DeployFacilityCovenantRegistry --rpc-url http://127.0.0.1:8545 --broadcast
 ```
 
+Run the provided data through the API with curl:
+
+```bash
+./scripts/curl_covenant_samples.sh
+```
+
+Equivalent individual curl commands:
+
+```bash
+curl -sS http://127.0.0.1:8000/api/v1/health
+
+curl -sS \
+  -X POST http://127.0.0.1:8000/api/v1/covenants/calculate \
+  -H "Content-Type: application/json" \
+  -H "X-Fence-Facility-Type: educa" \
+  --data-binary @data/facility_a_educa_isa.json
+
+curl -sS \
+  -X POST http://127.0.0.1:8000/api/v1/covenants/calculate \
+  -H "Content-Type: application/json" \
+  -H "X-Fence-Facility-Type: payearly" \
+  --data-binary @data/facility_b_payearly_ewa.json
+
+curl -sS \
+  -X POST http://127.0.0.1:8000/api/v1/covenants/calculate \
+  -H "Content-Type: application/json" \
+  -H "X-Fence-Facility-Type: nomina" \
+  --data-binary @data/facility_c_nomina.json
+
+curl -sS \
+  http://127.0.0.1:8000/api/v1/covenants/result \
+  -H "X-Fence-Facility-Type: educa"
+```
+
 Run quality checks manually:
 
 ```bash
@@ -169,13 +215,8 @@ Available endpoints in the current scaffold:
 
 - `GET /`
 - `GET /api/v1/health`
-
-Near-term usage to document as implementation grows:
-
-- how to load sample facility data,
-- how to generate covenant reports,
-- how to publish covenant outputs from the backend with `web3py`,
-- how to run tests.
+- `POST /api/v1/covenants/calculate`
+- `GET /api/v1/covenants/result`
 
 ## Transcript
 

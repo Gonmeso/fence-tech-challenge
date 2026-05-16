@@ -1,0 +1,135 @@
+[
+  {
+    "type": "function",
+    "name": "getFacilityReport",
+    "inputs": [
+      {
+        "name": "facility",
+        "type": "string",
+        "internalType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "internalType": "struct FacilityCovenantRegistry.FacilityReport",
+        "components": [
+          {
+            "name": "facility",
+            "type": "string",
+            "internalType": "string"
+          },
+          {
+            "name": "effectiveRateBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "covenantStatus",
+            "type": "uint8",
+            "internalType": "enum FacilityCovenantRegistry.CovenantStatus"
+          },
+          {
+            "name": "totalAssetsEvaluated",
+            "type": "uint32",
+            "internalType": "uint32"
+          },
+          {
+            "name": "assetsIncludedCount",
+            "type": "uint32",
+            "internalType": "uint32"
+          },
+          {
+            "name": "assetsExcludedCount",
+            "type": "uint32",
+            "internalType": "uint32"
+          },
+          {
+            "name": "includedExternalIds",
+            "type": "string[]",
+            "internalType": "string[]"
+          },
+          {
+            "name": "excludedExternalIds",
+            "type": "string[]",
+            "internalType": "string[]"
+          },
+          {
+            "name": "updatedAt",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "updatedBy",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "exists",
+            "type": "bool",
+            "internalType": "bool"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "reportExists",
+    "inputs": [
+      {
+        "name": "facility",
+        "type": "string",
+        "internalType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "updateFacilityReport",
+    "inputs": [
+      {
+        "name": "facility",
+        "type": "string",
+        "internalType": "string"
+      },
+      {
+        "name": "effectiveRateBps",
+        "type": "uint16",
+        "internalType": "uint16"
+      },
+      {
+        "name": "covenantStatus",
+        "type": "uint8",
+        "internalType": "enum FacilityCovenantRegistry.CovenantStatus"
+      },
+      {
+        "name": "totalAssetsEvaluated",
+        "type": "uint32",
+        "internalType": "uint32"
+      },
+      {
+        "name": "includedExternalIds",
+        "type": "string[]",
+        "internalType": "string[]"
+      },
+      {
+        "name": "excludedExternalIds",
+        "type": "string[]",
+        "internalType": "string[]"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  }
+]

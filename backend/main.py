@@ -5,8 +5,13 @@ from fastapi.responses import JSONResponse
 from loguru import logger
 
 from api.v1.router import api_router
+from core.clients.contract_abi import load_registry_abi
 from core.exceptions import (
     CalculatorExecutionError,
+    CovenantPublicationError,
+    CovenantRegistryConfigurationError,
+    CovenantRegistryReadError,
+    CovenantReportNotFoundError,
     FacilityPayloadValidationError,
     FenceAppError,
     InvalidFacilityHeaderError,
@@ -39,6 +44,7 @@ async def lifespan(_: FastAPI):
         app_name=settings.app_name,
         environment=settings.environment,
     )
+    load_registry_abi(settings.covenant_registry_abi_path)
     yield
     logger.info("Stopping {app_name}", app_name=settings.app_name)
 
@@ -187,6 +193,78 @@ async def handle_calculator_execution(
     exc: CalculatorExecutionError,
 ) -> JSONResponse:
     """Handle unexpected calculator execution failures.
+
+    Args:
+        _: Incoming FastAPI request.
+        exc: Raised application error.
+
+    Returns:
+        JSONResponse: HTTP 500 error response.
+    """
+
+    return build_error_response(exc, 500)
+
+
+@app.exception_handler(CovenantRegistryConfigurationError)
+async def handle_covenant_registry_configuration(
+    _: Request,
+    exc: CovenantRegistryConfigurationError,
+) -> JSONResponse:
+    """Handle missing or invalid smart contract configuration.
+
+    Args:
+        _: Incoming FastAPI request.
+        exc: Raised application error.
+
+    Returns:
+        JSONResponse: HTTP 500 error response.
+    """
+
+    return build_error_response(exc, 500)
+
+
+@app.exception_handler(CovenantPublicationError)
+async def handle_covenant_publication(
+    _: Request,
+    exc: CovenantPublicationError,
+) -> JSONResponse:
+    """Handle smart contract publication failures.
+
+    Args:
+        _: Incoming FastAPI request.
+        exc: Raised application error.
+
+    Returns:
+        JSONResponse: HTTP 500 error response.
+    """
+
+    return build_error_response(exc, 500)
+
+
+@app.exception_handler(CovenantReportNotFoundError)
+async def handle_covenant_report_not_found(
+    _: Request,
+    exc: CovenantReportNotFoundError,
+) -> JSONResponse:
+    """Handle missing on-chain covenant reports.
+
+    Args:
+        _: Incoming FastAPI request.
+        exc: Raised application error.
+
+    Returns:
+        JSONResponse: HTTP 404 error response.
+    """
+
+    return build_error_response(exc, 404)
+
+
+@app.exception_handler(CovenantRegistryReadError)
+async def handle_covenant_registry_read(
+    _: Request,
+    exc: CovenantRegistryReadError,
+) -> JSONResponse:
+    """Handle smart contract read failures.
 
     Args:
         _: Incoming FastAPI request.

@@ -3,6 +3,10 @@ from fastapi import Header
 from business.calculator.dispatcher import CalculatorDispatcher
 from business.covenant import CovenantHandler
 from business.enums import FacilityType
+from core.clients.covenant_registry import (
+    CovenantRegistryClient,
+    get_covenant_registry_client,
+)
 from core.exceptions import InvalidFacilityHeaderError, MissingFacilityHeaderError
 from core.settings import get_settings
 
@@ -44,6 +48,16 @@ def get_calculator_dispatcher() -> CalculatorDispatcher:
     return CalculatorDispatcher(get_settings())
 
 
+def get_registry_client() -> CovenantRegistryClient:
+    """Build the smart contract registry client for the configured chain.
+
+    Returns:
+        CovenantRegistryClient: Chain-aware registry client.
+    """
+
+    return get_covenant_registry_client(get_settings())
+
+
 def get_covenant_handler() -> CovenantHandler:
     """Build the covenant handler used by calculation endpoints.
 
@@ -51,4 +65,7 @@ def get_covenant_handler() -> CovenantHandler:
         CovenantHandler: Handler wired with a calculator dispatcher.
     """
 
-    return CovenantHandler(get_calculator_dispatcher())
+    return CovenantHandler(
+        dispatcher=get_calculator_dispatcher(),
+        registry_client=get_registry_client(),
+    )

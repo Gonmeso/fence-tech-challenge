@@ -1,12 +1,104 @@
 import sys
+from collections.abc import Iterator
 from decimal import Decimal
 from pathlib import Path
 
 import pytest
+from fastapi.testclient import TestClient
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from api.deps import get_covenant_handler
+from business.calculator.dispatcher import CalculatorDispatcher
+from business.covenant import CovenantHandler
+from business.enums import FacilityType
+from core.exceptions import CovenantReportNotFoundError
 from core.settings import Settings
+from main import app
+from schemas.covenant import (
+    CovenantPublication,
+    CovenantResult,
+    CovenantSummary,
+    OnChainCovenantResult,
+)
+
+
+class FakeCovenantRegistryClient:
+    """In-memory contract client for API tests."""
+
+    chain_id = 31337
+    contract_address = "0x0000000000000000000000000000000000000001"
+
+    def __init__(self) -> None:
+        """Initialize empty reports.
+
+        Returns:
+            None: Initializes the fake client.
+        """
+
+        self._reports: dict[FacilityType, OnChainCovenantResult] = {}
+        self._transaction_count = 0
+
+    async def publish_facility_report(
+        self,
+        *,
+        facility_type: FacilityType,
+        result: CovenantResult,
+    ) -> CovenantPublication:
+        """Store a report in memory.
+
+        Args:
+            facility_type: Facility associated with the report.
+            result: Calculated covenant result.
+
+        Returns:
+            CovenantPublication: Fake transaction metadata.
+        """
+
+        self._transaction_count += 1
+        transaction_hash = f"0x{self._transaction_count:064x}"
+        effective_rate_bps = round(result.computed_effective_rate * 100)
+        self._reports[facility_type] = OnChainCovenantResult(
+            facility=facility_type.value,
+            effective_rate_bps=effective_rate_bps,
+            computed_effective_rate=effective_rate_bps / 100,
+            covenant_status=result.covenant_status,
+            summary=CovenantSummary(
+                total_assets_evaluated=result.summary.total_assets_evaluated,
+                assets_included=result.summary.assets_included,
+                assets_excluded=result.summary.assets_excluded,
+            ),
+            included_assets=result.included_assets,
+            excluded_assets=[asset.external_id for asset in result.excluded_assets],
+            updated_at=self._transaction_count,
+            updated_by="0x0000000000000000000000000000000000000002",
+            exists=True,
+            chain_id=self.chain_id,
+            contract_address=self.contract_address,
+        )
+        return CovenantPublication(
+            chain_id=self.chain_id,
+            contract_address=self.contract_address,
+            transaction_hash=transaction_hash,
+        )
+
+    async def get_facility_report(self, *, facility_type: FacilityType) -> OnChainCovenantResult:
+        """Read a report from memory.
+
+        Args:
+            facility_type: Facility requested by the caller.
+
+        Raises:
+            CovenantReportNotFoundError: If no report has been stored.
+
+        Returns:
+            OnChainCovenantResult: Stored report.
+        """
+
+        try:
+            return self._reports[facility_type]
+        except KeyError as exc:
+            raise CovenantReportNotFoundError(facility_type=facility_type) from exc
 
 
 @pytest.fixture
@@ -16,6 +108,28 @@ def settings() -> Settings:
         payearly_covenant_threshold=Decimal("3.0"),
         nomina_covenant_threshold=Decimal("5.0"),
     )
+
+
+@pytest.fixture
+def fake_registry_client() -> FakeCovenantRegistryClient:
+    return FakeCovenantRegistryClient()
+
+
+@pytest.fixture
+def api_client(
+    settings: Settings,
+    fake_registry_client: FakeCovenantRegistryClient,
+) -> Iterator[TestClient]:
+    def build_handler() -> CovenantHandler:
+        return CovenantHandler(
+            dispatcher=CalculatorDispatcher(settings),
+            registry_client=fake_registry_client,
+        )
+
+    app.dependency_overrides[get_covenant_handler] = build_handler
+    with TestClient(app) as client:
+        yield client
+    app.dependency_overrides.clear()
 
 
 @pytest.fixture

@@ -52,6 +52,7 @@ class InvalidFacilityHeaderError(FenceAppError):
             details=[
                 {
                     "provided_value": provided_value,
+                    "allowed_values": [facility_type.value for facility_type in FacilityType],
                 }
             ]
         )
@@ -110,3 +111,43 @@ class CalculatorExecutionError(FenceAppError):
 
     code = "calculator_execution_error"
     message = "Failed to calculate covenant result"
+
+
+class CovenantRegistryConfigurationError(FenceAppError):
+    """Raised when smart contract settings are incomplete or invalid."""
+
+    code = "covenant_registry_configuration_error"
+    message = "Covenant registry configuration is incomplete"
+
+
+class CovenantPublicationError(FenceAppError):
+    """Raised when the covenant report cannot be published on-chain."""
+
+    code = "covenant_publication_error"
+    message = "Failed to publish covenant result on-chain"
+
+
+class CovenantReportNotFoundError(FenceAppError):
+    """Raised when no on-chain covenant report exists for the facility."""
+
+    code = "covenant_report_not_found"
+    message = "No covenant result has been published for this facility"
+
+    def __init__(self, *, facility_type: FacilityType) -> None:
+        """Capture the facility that does not have an on-chain report.
+
+        Args:
+            facility_type: Facility requested by the caller.
+
+        Returns:
+            None: Initializes the exception instance.
+        """
+
+        super().__init__(details=[{"facility_type": facility_type.value}])
+
+
+class CovenantRegistryReadError(FenceAppError):
+    """Raised when the covenant report cannot be read from the contract."""
+
+    code = "covenant_registry_read_error"
+    message = "Failed to read covenant result from the smart contract"

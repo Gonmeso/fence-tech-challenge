@@ -785,3 +785,90 @@ session responses, rather than reduced to short summaries.
   - `rtk forge test`
 
   The smart-contract test suite remained green with 8 passing tests under the submodule-backed setup.
+
+## Entry 039
+- Timestamp: 2026-05-15 19:49:14 CEST
+- Type: misc
+- Status: completed
+- Human
+  Okey, now that we have the smart contract implementation as well lets plan the following:
+
+  * async web3py client to make web3 calls: read facility covenant results and write the results to the smart contract. It should be a singletone so connections can be reused
+  * Create a script to start both the API and the local testnet to try everything
+  * Create curl commands to test the data that has been provided
+  * Create end to end tests to make sure that everything works
+- Agent
+  I reviewed the current backend calculation flow, the smart-contract registry interface, and the existing local scripts before proposing the plan. The main recommendation is to keep covenant calculation separate from publication, and to give the backend a dedicated async contract client layer instead of mixing raw `web3py` calls into handlers or endpoints.
+
+  The implementation plan is:
+
+  1. Add an async contract client layer in `backend` with cached `AsyncWeb3` connection reuse, contract settings, a stable registry ABI checked into the backend, and a small wrapper that exposes `report_exists`, `get_facility_report`, and `publish_facility_report`.
+  2. Add a publication service on top of the existing calculator flow, keeping `CovenantHandler` calculation-only. Expose one endpoint to calculate and publish a report, and one endpoint to read the latest published report for a facility.
+  3. Add a local stack script that starts `anvil`, deploys `FacilityCovenantRegistry`, exports the deployed contract address and RPC settings, and then starts the FastAPI app with the correct environment.
+  4. Add documented `curl` commands for health, calculation, publish, and published-report retrieval using the provided JSON files under `data/`.
+  5. Add end-to-end pytest coverage that boots a local chain, deploys the registry, calls the backend publish/read flow, and asserts the on-chain state matches the backend result.
+
+  I also called out one concrete design choice for the implementation phase: the backend should use a checked-in ABI file or generated backend-local contract interface, not depend on reading Foundry build artifacts directly at runtime. That keeps deployment and tests simpler and decouples backend runtime from `smart-contract/out`.
+
+## Entry 040
+- Timestamp: 2026-05-15 19:58:02 CEST
+- Type: misc
+- Status: completed
+- Human
+  Some updates
+  * Covenant handler should be the one using the calculated output to wre it into the smart contract
+  * async web3py should have a registry based on chain id
+  * Return for the api (reuse same endpoint) should include the has so create a new schema for this response
+  * Yes, add the abi.json to the backend, it should load at startup but make sure that we can load standalone as well for testing
+  * do not add the pousblish endpoint
+  * Add the endpoint to check the data on chain for the facility (header based) as covenant/result
+- Agent
+  I revised the plan around those constraints instead of splitting calculation and publication into separate services. The updated direction is: keep publication inside `CovenantHandler`, make the async `web3py` layer chain-aware via a registry keyed by chain id, reuse the existing calculate endpoint and expand its response schema to include publication metadata such as the transaction hash, check in `abi.json` under the backend and load it through a reusable loader that works both at app startup and in standalone tests, do not add a separate publish endpoint, and add a header-based endpoint at `covenant/result` to read the latest on-chain report for the declared facility.
+
+  I also noted one implementation detail for the next phase: the chain-id registry should own both the cached `AsyncWeb3` instance and the typed contract wrapper so chain selection happens once and the handler code stays focused on covenant behavior instead of connection management.
+
+## Entry 041
+- Timestamp: 2026-05-15 20:10:28 CEST
+- Type: development
+- Status: completed
+- Human
+  Lets start the implementation
+- Agent
+  Implemented the backend-to-smart-contract flow. The backend now includes a checked-in `FacilityCovenantRegistry` ABI under `backend/contracts`, a standalone ABI loader, and an async `web3.py` registry client keyed by chain id so `AsyncWeb3` and contract wrapper instances are reused. Contract settings were added for RPC URL, chain id, registry address, private key, and ABI path.
+
+  `CovenantHandler` now keeps its existing sync `calculate()` method for local calculation and adds async `calculate_and_publish()` plus `get_published_result()` methods. The existing `POST /api/v1/covenants/calculate` endpoint now calculates and publishes to the registry, returning the new `CovenantPublishedResult` schema with publication metadata including transaction hash. I did not add a separate publish endpoint. I also added `GET /api/v1/covenants/result`, which uses the same facility header pattern and reads the latest on-chain report for that facility.
+
+  Added local developer tooling: `scripts/run_local_stack.sh` starts Anvil, deploys the registry, exports backend contract env vars, and runs the API; `scripts/curl_covenant_samples.sh` posts all provided data files and reads each facility result. README usage now documents the full-stack script, contract env vars, curl commands, and the new endpoint list.
+
+  Added tests for ABI loading, mapping rates/statuses to contract values, handler publication, updated API behavior with an in-memory fake registry, and a real e2e test that starts Anvil, deploys the contract, posts the Educa sample through the API, and reads the report back through the on-chain result endpoint.
+
+  Verification passed:
+  - `rtk uv run ruff check .`
+  - `rtk uv run ty check .`
+  - `rtk uv run pytest`
+  - `bash -n scripts/run_local_stack.sh`
+  - `bash -n scripts/curl_covenant_samples.sh`
+
+  The full backend pytest run reported 51 passing tests with one dependency deprecation warning from `websockets.legacy`.
+
+## Entry 042
+- Timestamp: 2026-05-16 13:18:00 CEST
+- Type: misc
+- Status: completed
+- Human
+  check if forge is running a process
+- Agent
+  Tried to inspect the local process table for active Foundry processes using `ps` and `pgrep`, focusing on `forge`, `anvil`, and `cast`. The sandbox prevented reading the process list: `ps` returned `operation not permitted`, and `pgrep` returned `Cannot get process list`.
+
+  I reported that I could not confirm process state from the sandbox and provided the equivalent local commands for the user to run directly.
+
+## Entry 043
+- Timestamp: 2026-05-16 13:21:23 CEST
+- Type: clean-up
+- Status: completed
+- Human
+  commit the new changes for publishing the results and retrieval
+- Agent
+  Reviewed the pending changes for the smart-contract publication and retrieval implementation. The diff included the backend async registry client, ABI loader and checked-in ABI, handler/API/schema updates, contract error handling, fake and real e2e tests, local stack and curl helper scripts, README usage updates, and transcript entries.
+
+  I staged that implementation set and created a focused commit for the publishing and retrieval flow.
