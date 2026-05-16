@@ -6,84 +6,84 @@ challenge. The system is being designed around two connected projects:
 1. a FastAPI backend, which is the primary delivery surface;
 2. a smart contract publication layer for covenant outputs.
 
-## Status
+## Reasoning and Assumptions
 
-This README is intentionally structured to match the challenge deliverables.
-Reasoning and narrative details can be refined later, but the sections below
-should stay current as implementation evolves.
-
-## Assumptions
-
-- Facility data arrives in facility-specific formats and requires normalization
-  before calculation.
-- A facility-specific covenant definition is stable enough to encode as a versioned
-  calculation rule.
-- Covenant calculations must be reproducible from stored input snapshots or an
-  equivalent audit trail.
-- The backend is the source of orchestration, even when covenant outputs are later
-  published to a smart contract.
+- Facility data is delivered as JSON payloads via an API boundary, not as file
+  uploads or direct database access.
+- Facility data represents the current state of assets and obligations, not a
+  historical time series; a calculation request is treated as a snapshot rather
+  than a delta.
+- Data size is manageable within a single request and does not require
+  pagination or streaming.
+- Outputs should be available to all parties, so a public smart contract is the
+  preferred publication layer.
+- No authentication or access controls are required for the API or the smart
+  contract in this challenge scope.
 - The smart contract stores published covenant outputs only; it does not
   recalculate effective rates or eligibility rules on-chain.
-- Async SQLite is sufficient for local development only.
+- Financial values use Decimal arithmetic to avoid floating-point error.
+
 
 ## Design Choices
 
-- FastAPI is the main application boundary.
-- Pydantic models are used for validation and typed data contracts.
-- The backend scaffold is split into `core`, `schemas`, `api/v1`, and `business`
-  so infrastructure, contracts, transport, and domain logic stay separated from
-  the beginning.
-- Facility variability is handled through explicit adapters and calculation
-  strategies instead of one oversized shared model.
-- Publication is treated as a separate concern from calculation so the backend can
-  support either smart contract publication or a database-backed fallback.
-- The smart contract stores one latest covenant snapshot per supported facility
-  and leaves computation in Python.
-- The codebase is being optimized first for explainability and challenge fit, then
-  for production hardening.
-
-## Handling Facility Variability
-
-- Shared concepts such as `external_id`, monetary amounts, reporting dates, and
-  covenant outputs should be normalized into common internal structures.
-- Facility-specific source fields, eligibility rules, and effective-rate formulas
-  should remain isolated in facility modules.
-- Exclusion reasons should be first-class outputs so covenant reports explain why
-  an asset was omitted.
-- The current smart-contract publication layer intentionally stores excluded
-  asset IDs without exclusion reasons to keep the first on-chain shape smaller.
+- FastAPI is the main application boundary with a single shared endpoint; the
+  `X-Fence-Facility-Type` header routes requests to facility-specific
+  calculators, keeping the API surface uniform while isolating variable logic
+  per facility.
+- Pydantic models enforce typed data contracts at every layer.
+- The scaffold is split into `core`, `schemas`, `api/v1`, and `business` so
+  infrastructure, contracts, transport, and domain logic stay separated.
+- Each facility has its own calculator class behind a common interface; new
+  facilities are added by implementing a calculator and updating the resolver
+  without touching endpoints.
+- Publication is a separate concern from calculation; the smart contract stores
+  one normalized covenant snapshot per facility and leaves computation in Python.
+- The codebase is optimized first for explainability and challenge fit, then for
+  production hardening.
 
 ## How The Covenant Model Influenced The Architecture
 
-- Covenant computation must be independently verifiable, so the architecture
-  should preserve calculation inputs, eligibility decisions, and the final result.
-- Publication should happen from a deterministic report artifact rather than from
-  ad hoc runtime state.
-- Reporting must include both the computed rate and the compliance decision,
-  because downstream financial processes depend on both.
-- On-chain publication is modeled as a storage concern so counterparties can read
-  the latest facility report without trusting transient backend state.
+- The requirement to publish verifiable outputs on-chain drove a hard split
+  between calculation (Python, per-facility) and publication (normalized
+  on-chain snapshot), rather than mixing them in a single handler.
+- Independent verifiability of the covenant result led to a dedicated GET
+  endpoint that reads back the on-chain snapshot, so all parties can confirm
+  the published data matches the calculated output.
+
 
 ## Trade-Offs
 
-- Prioritizing the FastAPI backend first reduces delivery risk but may delay full
-  on-chain publication depth.
-- Explicit facility modules increase code volume, but they keep differing business
-  logic legible and testable.
-- SQLite keeps local setup simple, but it is not the target production datastore.
-- Omitting exclusion reasons on-chain reduces storage complexity now, but detailed
-  exclusion rationale remains an off-chain concern until a later revision.
+- Layered architecture vs simplicity: the layered approach adds some complexity
+  and indirection, but it improves maintainability, testability, and separation
+  of concerns for a production-grade system.
+- Single vs multiple endpoints: a single endpoint with a facility type header
+  avoids code duplication, but requires clients to set the header correctly and
+  adds routing logic that must be clearly documented.
+- Database vs smart contract for persistence: the smart contract is used as the
+  source of truth for published results, avoiding an additional persistence
+  layer given the challenge scope.
+- Header-based routing vs body-based routing: a header keeps the request body
+  focused on the data payload, but is less self-describing than including the
+  facility type in the body.
+- Header-based vs auth-token routing: because authentication is out of scope,
+  an explicit header is the simplest way to specify the facility type.
+- Foundry vs Hardhat: Foundry was chosen because Hardhat is more
+  JavaScript/TypeScript-heavy, which adds friction in a Python-first project.
+
 
 ## How To Evolve This Toward Production
 
-- Replace SQLite with a production-grade relational database.
-- Add versioned covenant definitions and report schemas.
-- Persist raw imports, normalized assets, and calculation artifacts separately for
-  stronger auditability.
-- Add authentication, authorization, and provenance controls around publication.
-- Harden smart contract deployment, event indexing, and reconciliation workflows.
-- Expand automated testing with fixture-driven facility coverage and end-to-end
-  publication scenarios.
+- The smart contract should be its own repository with a clear versioning and deployment strategy; for this challenge it is included as a submodule, but it should not live alongside the backend code long-term.
+- Add a CI/CD pipeline for automated testing, linting, and deployment.
+- Better monitoring and observability with structured logging, metrics, and tracing (Sentry, ELK).
+- Implement authentication and authorization for the API and smart contract interactions.
+- Smart contract security audits and formal verification for critical components.
+- Better exception handling at the smart contract level.
+- Improved containerization and orchestration for local development and production deployment (multipart, python version).
+- Depends on the real nature of the production environment, but improve handling of much bigger data payloads, potentially with streaming or batch processing.
+- Vendor specific optimizations (AWS, ECS, Lambda, etc.) depending on the target deployment environment, and cloud usage patterns.
+- Maybe saving the historical data of the calculations and the publications, depending on the need of the business, but that would require a more complex data model and potentially a different approach to persistence and smart contract design.
+
 
 ## Setup
 
@@ -91,7 +91,6 @@ Current local stack:
 
 - Python managed with `uv`
 - FastAPI backend
-- Async SQLite for local persistence
 - `web3py` for async contract interaction
 - Foundry toolchain for contract work (`forge`, `cast`, `anvil`)
 
