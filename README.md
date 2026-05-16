@@ -26,49 +26,28 @@ challenge. The system is being designed around two connected projects:
 
 ## Design Choices
 
-- FastAPI is the main application boundary with a single shared endpoint; the
-  `X-Fence-Facility-Type` header routes requests to facility-specific
-  calculators, keeping the API surface uniform while isolating variable logic
-  per facility.
+- FastAPI is the main application boundary with a single shared endpoint; the `X-Fence-Facility-Type` header routes requests to facility-specific calculators, keeping the API surface uniform while isolating variable logic per facility.
 - Pydantic models enforce typed data contracts at every layer.
-- The scaffold is split into `core`, `schemas`, `api/v1`, and `business` so
-  infrastructure, contracts, transport, and domain logic stay separated.
-- Each facility has its own calculator class behind a common interface; new
-  facilities are added by implementing a calculator and updating the resolver
-  without touching endpoints.
-- Publication is a separate concern from calculation; the smart contract stores
-  one normalized covenant snapshot per facility and leaves computation in Python.
-- The codebase is optimized first for explainability and challenge fit, then for
-  production hardening.
+- The scaffold is split into `core`, `schemas`, `api/v1`, and `business` so infrastructure, contracts, transport, and domain logic stay separated.
+- Each facility has its own calculator class behind a common interface; new facilities are added by implementing a calculator and updating the resolver without touching endpoints.
+- Publication is a separate concern from calculation; the smart contract stores one normalized covenant snapshot per facility and leaves computation in Python.
+- The codebase is optimized first for explainability and challenge fit, then for production hardening.
 
 ## How The Covenant Model Influenced The Architecture
 
-- The requirement to publish verifiable outputs on-chain drove a hard split
-  between calculation (Python, per-facility) and publication (normalized
-  on-chain snapshot), rather than mixing them in a single handler.
-- Independent verifiability of the covenant result led to a dedicated GET
-  endpoint that reads back the on-chain snapshot, so all parties can confirm
-  the published data matches the calculated output.
+- The requirement to publish verifiable outputs on-chain drove a hard split between calculation (Python, per-facility) and publication (normalized on-chain snapshot), rather than mixing them in a single handler.
+- Independent verifiability of the covenant result led to a dedicated GET endpoint that reads back the on-chain snapshot, so all parties can confirm the published data matches the calculated output.
+- Single endpoint vs multiple endpoints was a key design choice influenced by the need to support multiple facility types without proliferating routes; the header-based routing allows for a clean separation of logic while keeping the API surface minimal.
 
 
 ## Trade-Offs
 
-- Layered architecture vs simplicity: the layered approach adds some complexity
-  and indirection, but it improves maintainability, testability, and separation
-  of concerns for a production-grade system.
-- Single vs multiple endpoints: a single endpoint with a facility type header
-  avoids code duplication, but requires clients to set the header correctly and
-  adds routing logic that must be clearly documented.
-- Database vs smart contract for persistence: the smart contract is used as the
-  source of truth for published results, avoiding an additional persistence
-  layer given the challenge scope.
-- Header-based routing vs body-based routing: a header keeps the request body
-  focused on the data payload, but is less self-describing than including the
-  facility type in the body.
-- Header-based vs auth-token routing: because authentication is out of scope,
-  an explicit header is the simplest way to specify the facility type.
-- Foundry vs Hardhat: Foundry was chosen because Hardhat is more
-  JavaScript/TypeScript-heavy, which adds friction in a Python-first project.
+- Layered architecture vs simplicity: the layered approach adds some complexity and indirection, but it improves maintainability, testability, and separation of concerns for a production-grade system.
+- Single vs multiple endpoints: a single endpoint with a facility type header avoids code duplication, but requires clients to set the header correctly and adds routing logic that must be clearly documented.
+- Database vs smart contract for persistence: the smart contract is used as the source of truth for published results, avoiding an additional persistence layer given the challenge scope.
+- Header-based routing vs body-based routing: a header keeps the request body focused on the data payload, but is less self-describing than including the facility type in the body.
+- Header-based vs auth-token routing: because authentication is out of scope, an explicit header is the simplest way to specify the facility type.
+- Foundry vs Hardhat: Foundry was chosen because Hardhat is more JavaScript/TypeScript-heavy, which adds friction in a Python-first project.
 
 
 ## How To Evolve This Toward Production
