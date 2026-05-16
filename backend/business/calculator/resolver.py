@@ -2,6 +2,7 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
+from loguru import logger
 from pydantic import ValidationError
 
 from business.calculator.base import BaseCalculator
@@ -22,7 +23,7 @@ from schemas.payearly import PayearlyPortfolio
 
 
 @dataclass(frozen=True)
-class DispatchedCalculator:
+class ResolvedCalculator:
     """Bundle the validated portfolio and calculator for one facility."""
 
     facility_type: FacilityType
@@ -30,7 +31,7 @@ class DispatchedCalculator:
     calculator: BaseCalculator[Any]
 
 
-class CalculatorDispatcher:
+class CalculatorResolver:
     """Resolve facility payloads into concrete calculator inputs."""
 
     def __init__(self, settings: Settings) -> None:
@@ -42,12 +43,12 @@ class CalculatorDispatcher:
 
         self._settings = settings
 
-    def dispatch(
+    def resolve(
         self,
         *,
         facility_type: FacilityType,
         payload: str | bytes | list[dict[str, Any]],
-    ) -> DispatchedCalculator:
+    ) -> ResolvedCalculator:
         """Validate a payload and return the matching calculator bundle.
 
         Args:
@@ -61,7 +62,7 @@ class CalculatorDispatcher:
             FacilityPayloadValidationError: If the payload schema is invalid.
 
         Returns:
-            DispatchedCalculator: Validated portfolio and calculator pair.
+            ResolvedCalculator: Validated portfolio and calculator pair.
         """
 
         parsed_payload = self._parse_payload(payload)
@@ -91,7 +92,12 @@ class CalculatorDispatcher:
                 details=exc.errors(),
             ) from exc
 
-        return DispatchedCalculator(
+        logger.info(
+            "Resolved facility {facility_type} to {calculator}",
+            facility_type=facility_type.value,
+            calculator=calculator.__class__.__name__,
+        )
+        return ResolvedCalculator(
             facility_type=facility_type,
             portfolio=portfolio,
             calculator=calculator,

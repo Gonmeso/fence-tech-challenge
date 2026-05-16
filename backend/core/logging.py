@@ -1,6 +1,8 @@
 import logging
 import sys
+from typing import Any
 
+from asgi_correlation_id import correlation_id
 from loguru import logger
 
 
@@ -47,6 +49,7 @@ def configure_logging(log_level: str) -> None:
     """
 
     logger.remove()
+    logger.configure(patcher=_add_request_id)
     logger.add(
         sys.stderr,
         level=log_level.upper(),
@@ -55,6 +58,7 @@ def configure_logging(log_level: str) -> None:
         format=(
             "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
             "<level>{level: <8}</level> | "
+            "[{extra[request_id]}] | "
             "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> | "
             "<level>{message}</level>"
         ),
@@ -66,3 +70,18 @@ def configure_logging(log_level: str) -> None:
         logging_logger = logging.getLogger(logger_name)
         logging_logger.handlers = [InterceptHandler()]
         logging_logger.propagate = False
+
+
+def _add_request_id(record: Any) -> None:
+    """Attach the active request id to every Loguru record.
+
+    Args:
+        record: Loguru record that will be formatted.
+
+    Returns:
+        None: Mutates the record in place.
+    """
+
+    extra = record["extra"]
+    if isinstance(extra, dict):
+        extra["request_id"] = correlation_id.get() or "-"

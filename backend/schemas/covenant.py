@@ -1,6 +1,7 @@
+from decimal import Decimal
 from enum import StrEnum
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_serializer
 
 
 class CovenantStatus(StrEnum):
@@ -28,11 +29,24 @@ class CovenantSummary(BaseModel):
 class CovenantResult(BaseModel):
     """Final covenant output returned by calculators and the API."""
 
-    computed_effective_rate: float
+    computed_effective_rate: Decimal
     covenant_status: CovenantStatus
     summary: CovenantSummary
     included_assets: list[str]
     excluded_assets: list[ExcludedAsset]
+
+    @field_serializer("computed_effective_rate", when_used="json")
+    def serialize_computed_effective_rate(self, value: Decimal) -> str:
+        """Serialize rates as strings to preserve decimal precision.
+
+        Args:
+            value: Decimal effective rate.
+
+        Returns:
+            str: Decimal rate formatted for JSON responses.
+        """
+
+        return str(value)
 
 
 class CovenantPublication(BaseModel):
@@ -54,13 +68,25 @@ class OnChainCovenantResult(BaseModel):
 
     facility: str
     effective_rate_bps: int
-    computed_effective_rate: float
+    computed_effective_rate: Decimal
     covenant_status: CovenantStatus
     summary: CovenantSummary
     included_assets: list[str]
     excluded_assets: list[str]
     updated_at: int
-    updated_by: str
     exists: bool
     chain_id: int
     contract_address: str
+
+    @field_serializer("computed_effective_rate", when_used="json")
+    def serialize_computed_effective_rate(self, value: Decimal) -> str:
+        """Serialize rates as strings to preserve decimal precision.
+
+        Args:
+            value: Decimal effective rate.
+
+        Returns:
+            str: Decimal rate formatted for JSON responses.
+        """
+
+        return str(value)

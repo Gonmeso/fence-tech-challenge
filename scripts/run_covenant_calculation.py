@@ -7,7 +7,7 @@ import sys
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "backend"))
 
-from business.calculator.dispatcher import CalculatorDispatcher  # noqa: E402
+from business.calculator.resolver import CalculatorResolver  # noqa: E402
 from business.covenant import CovenantHandler  # noqa: E402
 from business.enums import FacilityType  # noqa: E402
 from core.settings import get_settings  # noqa: E402
@@ -20,7 +20,7 @@ def main() -> None:
     args = parser.parse_args()
 
     payload = Path(args.file).read_text()
-    handler = CovenantHandler(CalculatorDispatcher(get_settings()))
+    handler = CovenantHandler(CalculatorResolver(get_settings()))
     result = handler.calculate(
         facility_type=FacilityType(args.facility),
         payload=payload,

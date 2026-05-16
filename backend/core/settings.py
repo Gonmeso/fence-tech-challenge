@@ -1,10 +1,21 @@
 from decimal import Decimal
+from enum import StrEnum
 from functools import lru_cache
 from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from core.clients.contract_abi import default_registry_abi_path
+from core.utils.contract_abi import default_registry_abi_path
+
+
+class LogLevel(StrEnum):
+    """Supported application log levels loaded from `FENCE_LOG_LEVEL`."""
+
+    DEBUG = "DEBUG"
+    INFO = "INFO"
+    WARNING = "WARNING"
+    ERROR = "ERROR"
+    CRITICAL = "CRITICAL"
 
 
 class Settings(BaseSettings):
@@ -13,7 +24,7 @@ class Settings(BaseSettings):
     app_name: str = "Fence Tech Challenge Backend"
     environment: str = "local"
     api_v1_prefix: str = "/api/v1"
-    log_level: str = "INFO"
+    log_level: LogLevel = LogLevel.INFO
     educa_covenant_threshold: Decimal = Decimal("22.0")
     payearly_covenant_threshold: Decimal = Decimal("3.0")
     nomina_covenant_threshold: Decimal = Decimal("5.0")

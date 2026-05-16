@@ -1,6 +1,6 @@
 import sys
 from collections.abc import Iterator
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 
 import pytest
@@ -8,8 +8,9 @@ from fastapi.testclient import TestClient
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+import main as app_module
 from api.deps import get_covenant_handler
-from business.calculator.dispatcher import CalculatorDispatcher
+from business.calculator.resolver import CalculatorResolver
 from business.covenant import CovenantHandler
 from business.enums import FacilityType
 from core.exceptions import CovenantReportNotFoundError
@@ -57,11 +58,16 @@ class FakeCovenantRegistryClient:
 
         self._transaction_count += 1
         transaction_hash = f"0x{self._transaction_count:064x}"
-        effective_rate_bps = round(result.computed_effective_rate * 100)
+        effective_rate_bps = int(
+            (result.computed_effective_rate * Decimal("100")).quantize(
+                Decimal("1"),
+                rounding=ROUND_HALF_UP,
+            )
+        )
         self._reports[facility_type] = OnChainCovenantResult(
             facility=facility_type.value,
             effective_rate_bps=effective_rate_bps,
-            computed_effective_rate=effective_rate_bps / 100,
+            computed_effective_rate=Decimal(effective_rate_bps) / Decimal("100"),
             covenant_status=result.covenant_status,
             summary=CovenantSummary(
                 total_assets_evaluated=result.summary.total_assets_evaluated,
@@ -71,7 +77,6 @@ class FakeCovenantRegistryClient:
             included_assets=result.included_assets,
             excluded_assets=[asset.external_id for asset in result.excluded_assets],
             updated_at=self._transaction_count,
-            updated_by="0x0000000000000000000000000000000000000002",
             exists=True,
             chain_id=self.chain_id,
             contract_address=self.contract_address,
@@ -119,13 +124,15 @@ def fake_registry_client() -> FakeCovenantRegistryClient:
 def api_client(
     settings: Settings,
     fake_registry_client: FakeCovenantRegistryClient,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> Iterator[TestClient]:
     def build_handler() -> CovenantHandler:
         return CovenantHandler(
-            dispatcher=CalculatorDispatcher(settings),
+            resolver=CalculatorResolver(settings),
             registry_client=fake_registry_client,
         )
 
+    monkeypatch.setattr(app_module, "check_rpc_connection", lambda *_args, **_kwargs: 31337)
     app.dependency_overrides[get_covenant_handler] = build_handler
     with TestClient(app) as client:
         yield client

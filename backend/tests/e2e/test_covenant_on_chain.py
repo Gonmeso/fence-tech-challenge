@@ -12,8 +12,9 @@ from urllib import request
 import pytest
 from fastapi.testclient import TestClient
 
+import main as app_module
 from api.deps import get_covenant_handler
-from business.calculator.dispatcher import CalculatorDispatcher
+from business.calculator.resolver import CalculatorResolver
 from business.covenant import CovenantHandler
 from core.clients.covenant_registry import (
     get_covenant_registry_client,
@@ -24,9 +25,7 @@ from main import app
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 SMART_CONTRACT_ROOT = REPO_ROOT / "smart-contract"
-DEFAULT_ANVIL_PRIVATE_KEY = (
-    "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
-)
+DEFAULT_ANVIL_PRIVATE_KEY = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
 
 
 def load_json(path: Path) -> str:
@@ -139,7 +138,11 @@ def registry_address(anvil_rpc_url: str) -> str:
 
 
 @pytest.fixture
-def on_chain_api_client(anvil_rpc_url: str, registry_address: str) -> Iterator[TestClient]:
+def on_chain_api_client(
+    anvil_rpc_url: str,
+    registry_address: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> Iterator[TestClient]:
     settings = Settings(
         educa_covenant_threshold=Decimal("22.0"),
         payearly_covenant_threshold=Decimal("3.0"),
@@ -152,11 +155,12 @@ def on_chain_api_client(anvil_rpc_url: str, registry_address: str) -> Iterator[T
 
     def build_handler() -> CovenantHandler:
         return CovenantHandler(
-            dispatcher=CalculatorDispatcher(settings),
+            resolver=CalculatorResolver(settings),
             registry_client=get_covenant_registry_client(settings),
         )
 
     reset_covenant_registry_clients()
+    monkeypatch.setattr(app_module.settings, "web3_rpc_url", anvil_rpc_url)
     app.dependency_overrides[get_covenant_handler] = build_handler
     with TestClient(app) as client:
         yield client
@@ -175,7 +179,7 @@ def test_api_publishes_and_reads_covenant_result_on_chain(
 
     assert response.status_code == 200
     published = response.json()
-    assert published["computed_effective_rate"] == 18.33
+    assert published["computed_effective_rate"] == "18.33"
     assert published["publication"]["transaction_hash"].startswith("0x")
 
     read_response = on_chain_api_client.get(
@@ -187,7 +191,7 @@ def test_api_publishes_and_reads_covenant_result_on_chain(
     on_chain = read_response.json()
     assert on_chain["facility"] == "educa"
     assert on_chain["effective_rate_bps"] == 1833
-    assert on_chain["computed_effective_rate"] == 18.33
+    assert on_chain["computed_effective_rate"] == "18.33"
     assert on_chain["summary"] == published["summary"]
     assert on_chain["included_assets"] == published["included_assets"]
     assert on_chain["excluded_assets"] == [

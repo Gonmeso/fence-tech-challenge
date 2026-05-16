@@ -2,6 +2,8 @@ from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from decimal import ROUND_HALF_UP, Decimal
 
+from loguru import logger
+
 from schemas.base import BaseFacilityAsset
 from schemas.covenant import (
     CovenantResult,
@@ -34,17 +36,17 @@ class BaseCalculator[PortfolioT](ABC):
             CovenantResult: Facility-specific covenant output.
         """
 
-    def _round_rate(self, value: Decimal) -> float:
+    def _round_rate(self, value: Decimal) -> Decimal:
         """Round rates to the two-decimal API representation.
 
         Args:
             value: Effective rate before serialization.
 
         Returns:
-            float: Rounded rate ready for the response payload.
+            Decimal: Rounded rate ready for the response payload.
         """
 
-        return float(value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+        return value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
     def _build_result(
         self,
@@ -74,6 +76,15 @@ class BaseCalculator[PortfolioT](ABC):
         ]
         covenant_status = (
             CovenantStatus.COMPLIANT if computed_rate < self.threshold else CovenantStatus.BREACH
+        )
+        logger.debug(
+            "Built covenant result with {included_assets}/{total_assets} included assets, "
+            "computed rate {computed_rate}, threshold {threshold}, status {status}",
+            included_assets=len(included_assets),
+            total_assets=len(assets),
+            computed_rate=str(computed_rate),
+            threshold=str(self.threshold),
+            status=covenant_status.value,
         )
 
         return CovenantResult(

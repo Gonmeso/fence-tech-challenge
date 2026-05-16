@@ -3,6 +3,19 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
+from main import REQUEST_ID_HEADER, app
+
+
+@app.get("/__tests/unhandled-error")
+async def raise_unhandled_error() -> None:
+    """Raise an unregistered exception for HTTP boundary tests.
+
+    Raises:
+        RuntimeError: Always raised to exercise the catch-all handler.
+    """
+
+    raise RuntimeError("private failure detail")
+
 
 def load_json(path: Path) -> str:
     return json.dumps(json.loads(path.read_text()))
@@ -15,12 +28,16 @@ def test_covenant_endpoint_calculates_educa_with_real_data(
     response = api_client.post(
         "/api/v1/covenants/calculate",
         content=load_json(data_dir / "facility_a_educa_isa.json"),
-        headers={"X-Fence-Facility-Type": "educa"},
+        headers={
+            "X-Fence-Facility-Type": "educa",
+            REQUEST_ID_HEADER: "123e4567-e89b-42d3-a456-426614174000",
+        },
     )
 
     assert response.status_code == 200
+    assert response.headers[REQUEST_ID_HEADER] == "123e4567-e89b-42d3-a456-426614174000"
     assert response.json() == {
-        "computed_effective_rate": 18.33,
+        "computed_effective_rate": "18.33",
         "covenant_status": "COMPLIANT",
         "summary": {
             "total_assets_evaluated": 8,
@@ -76,7 +93,7 @@ def test_covenant_endpoint_calculates_payearly_with_real_data(
     )
 
     assert response.status_code == 200
-    assert response.json()["computed_effective_rate"] == 0.0
+    assert response.json()["computed_effective_rate"] == "0.00"
     assert response.json()["covenant_status"] == "COMPLIANT"
 
 
@@ -91,7 +108,7 @@ def test_covenant_endpoint_calculates_nomina_with_real_data(
     )
 
     assert response.status_code == 200
-    assert response.json()["computed_effective_rate"] == 3.39
+    assert response.json()["computed_effective_rate"] == "3.39"
     assert response.json()["covenant_status"] == "COMPLIANT"
 
 
@@ -105,6 +122,7 @@ def test_covenant_endpoint_returns_400_for_missing_header(
     )
 
     assert response.status_code == 400
+    assert REQUEST_ID_HEADER in response.headers
     assert response.json() == {
         "code": "missing_facility_header",
         "message": "Missing X-Fence-Facility-Type header",
@@ -126,12 +144,7 @@ def test_covenant_endpoint_returns_400_for_invalid_header(
     assert response.json() == {
         "code": "invalid_facility_header",
         "message": "Invalid X-Fence-Facility-Type header",
-        "details": [
-            {
-                "provided_value": "unknown",
-                "allowed_values": ["educa", "payearly", "nomina"],
-            }
-        ],
+        "details": [],
     }
 
 
@@ -202,13 +215,14 @@ def test_covenant_result_endpoint_reads_published_report(
     body = response.json()
     assert body["facility"] == "nomina"
     assert body["effective_rate_bps"] == 339
-    assert body["computed_effective_rate"] == 3.39
+    assert body["computed_effective_rate"] == "3.39"
     assert body["covenant_status"] == "COMPLIANT"
     assert body["summary"] == {
         "total_assets_evaluated": 8,
         "assets_included": 4,
         "assets_excluded": 4,
     }
+    assert "updated_by" not in body
 
 
 def test_covenant_result_endpoint_returns_404_without_report(api_client: TestClient) -> None:
@@ -222,4 +236,18 @@ def test_covenant_result_endpoint_returns_404_without_report(api_client: TestCli
         "code": "covenant_report_not_found",
         "message": "No covenant result has been published for this facility",
         "details": [{"facility_type": "educa"}],
+    }
+
+
+def test_catch_all_handler_returns_safe_500_response() -> None:
+    client = TestClient(app, raise_server_exceptions=False)
+
+    response = client.get("/__tests/unhandled-error")
+
+    assert response.status_code == 500
+    assert REQUEST_ID_HEADER in response.headers
+    assert response.json() == {
+        "code": "internal_server_error",
+        "message": "Internal server error",
+        "details": [],
     }

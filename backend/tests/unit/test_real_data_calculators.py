@@ -1,4 +1,5 @@
 import json
+from decimal import Decimal
 from pathlib import Path
 
 from business.calculator import EducaCalculator, NominaCalculator, PayearlyCalculator
@@ -20,7 +21,7 @@ def test_educa_calculator_with_real_json(data_dir: Path, settings: Settings) -> 
 
     result = EducaCalculator(settings.educa_covenant_threshold).calculate(portfolio)
 
-    assert result.computed_effective_rate == 18.33
+    assert result.computed_effective_rate == Decimal("18.33")
     assert result.covenant_status == CovenantStatus.COMPLIANT
     assert result.summary.total_assets_evaluated == 8
     assert result.summary.assets_included == 5
@@ -34,7 +35,7 @@ def test_payearly_calculator_with_real_json(data_dir: Path, settings: Settings) 
 
     result = PayearlyCalculator(settings.payearly_covenant_threshold).calculate(portfolio)
 
-    assert result.computed_effective_rate == 0.0
+    assert result.computed_effective_rate == Decimal("0.00")
     assert result.covenant_status == CovenantStatus.COMPLIANT
     assert result.summary.total_assets_evaluated == 8
     assert result.summary.assets_included == 5
@@ -46,7 +47,7 @@ def test_nomina_calculator_with_real_json(data_dir: Path, settings: Settings) ->
 
     result = NominaCalculator(settings.nomina_covenant_threshold).calculate(portfolio)
 
-    assert result.computed_effective_rate == 3.39
+    assert result.computed_effective_rate == Decimal("3.39")
     assert result.covenant_status == CovenantStatus.COMPLIANT
     assert result.summary.total_assets_evaluated == 8
     assert result.summary.assets_included == 4

@@ -1,32 +1,24 @@
 from contextlib import asynccontextmanager
 
+from asgi_correlation_id import CorrelationIdMiddleware, correlation_id
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from loguru import logger
 
 from api.v1.router import api_router
-from core.clients.contract_abi import load_registry_abi
 from core.clients.rpc import check_rpc_connection
 from core.exceptions import (
-    CalculatorExecutionError,
-    CovenantPublicationError,
-    CovenantRegistryConfigurationError,
-    CovenantRegistryReadError,
-    CovenantReportNotFoundError,
-    FacilityPayloadValidationError,
     FenceAppError,
-    InvalidFacilityHeaderError,
-    InvalidJsonPayloadError,
-    InvalidPayloadTypeError,
-    MissingFacilityHeaderError,
-    UnsupportedFacilityError,
+    UnhandledApplicationError,
 )
 from core.logging import configure_logging
 from core.settings import get_settings
+from core.utils.contract_abi import load_registry_abi
 from schemas.error import ErrorResponse
 
 settings = get_settings()
-configure_logging(settings.log_level)
+configure_logging(settings.log_level.value)
+REQUEST_ID_HEADER = "X-Fence-Request-ID"
 
 
 @asynccontextmanager
@@ -61,227 +53,92 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
+app.add_middleware(
+    CorrelationIdMiddleware,
+    header_name=REQUEST_ID_HEADER,
+)
 app.include_router(api_router, prefix=settings.api_v1_prefix)
 
 
-# TODO: Split domain errors from HTTP mapping as the error model grows.
-def build_error_response(error: FenceAppError, status_code: int) -> JSONResponse:
+def build_error_response(error: FenceAppError) -> JSONResponse:
     """Convert a domain error into the shared API error payload.
 
     Args:
         error: Application error to expose through the API.
-        status_code: HTTP status code to return with the payload.
 
     Returns:
         JSONResponse: Serialized API error response.
     """
 
-    return JSONResponse(
-        status_code=status_code,
+    response = JSONResponse(
+        status_code=error.status_code,
         content=ErrorResponse(
             code=error.code,
             message=error.message,
             details=error.details,
         ).model_dump(),
     )
+    if request_id := correlation_id.get():
+        response.headers[REQUEST_ID_HEADER] = request_id
+    return response
 
 
-@app.exception_handler(MissingFacilityHeaderError)
-async def handle_missing_facility_header(
-    _: Request,
-    exc: MissingFacilityHeaderError,
+@app.exception_handler(FenceAppError)
+async def handle_fence_app_error(
+    request: Request,
+    exc: FenceAppError,
 ) -> JSONResponse:
-    """Handle requests that do not declare a facility header.
+    """Handle registered application errors with one API response shape.
 
     Args:
-        _: Incoming FastAPI request.
+        request: Incoming FastAPI request.
         exc: Raised application error.
 
     Returns:
-        JSONResponse: HTTP 400 error response.
+        JSONResponse: HTTP error response matching the exception status code.
     """
 
-    return build_error_response(exc, 400)
+    log = logger.bind(
+        error_code=exc.code,
+        public_details=exc.details,
+        private_details=exc.private_details,
+    )
+    if exc.status_code >= 500:
+        log.opt(exception=exc).error(
+            "Request failed with application error {method} {path}",
+            method=request.method,
+            path=request.url.path,
+        )
+    else:
+        log.warning(
+            "Request rejected with application error {method} {path}",
+            method=request.method,
+            path=request.url.path,
+        )
+    return build_error_response(exc)
 
 
-@app.exception_handler(InvalidFacilityHeaderError)
-async def handle_invalid_facility_header(
-    _: Request,
-    exc: InvalidFacilityHeaderError,
+@app.exception_handler(Exception)
+async def handle_unregistered_exception(
+    request: Request,
+    exc: Exception,
 ) -> JSONResponse:
-    """Handle requests with an invalid facility header.
+    """Handle unregistered exceptions without exposing implementation details.
 
     Args:
-        _: Incoming FastAPI request.
-        exc: Raised application error.
+        request: Incoming FastAPI request.
+        exc: Unregistered exception raised while serving the request.
 
     Returns:
-        JSONResponse: HTTP 400 error response.
+        JSONResponse: HTTP 500 error response with the shared error shape.
     """
 
-    return build_error_response(exc, 400)
-
-
-@app.exception_handler(InvalidJsonPayloadError)
-async def handle_invalid_json_payload(
-    _: Request,
-    exc: InvalidJsonPayloadError,
-) -> JSONResponse:
-    """Handle requests with malformed JSON bodies.
-
-    Args:
-        _: Incoming FastAPI request.
-        exc: Raised application error.
-
-    Returns:
-        JSONResponse: HTTP 400 error response.
-    """
-
-    return build_error_response(exc, 400)
-
-
-@app.exception_handler(InvalidPayloadTypeError)
-async def handle_invalid_payload_type(
-    _: Request,
-    exc: InvalidPayloadTypeError,
-) -> JSONResponse:
-    """Handle requests whose payload is not a JSON array.
-
-    Args:
-        _: Incoming FastAPI request.
-        exc: Raised application error.
-
-    Returns:
-        JSONResponse: HTTP 400 error response.
-    """
-
-    return build_error_response(exc, 400)
-
-
-@app.exception_handler(UnsupportedFacilityError)
-async def handle_unsupported_facility(
-    _: Request,
-    exc: UnsupportedFacilityError,
-) -> JSONResponse:
-    """Handle requests for unsupported facilities.
-
-    Args:
-        _: Incoming FastAPI request.
-        exc: Raised application error.
-
-    Returns:
-        JSONResponse: HTTP 400 error response.
-    """
-
-    return build_error_response(exc, 400)
-
-
-@app.exception_handler(FacilityPayloadValidationError)
-async def handle_facility_payload_validation(
-    _: Request,
-    exc: FacilityPayloadValidationError,
-) -> JSONResponse:
-    """Handle payloads that fail facility schema validation.
-
-    Args:
-        _: Incoming FastAPI request.
-        exc: Raised application error.
-
-    Returns:
-        JSONResponse: HTTP 422 error response.
-    """
-
-    return build_error_response(exc, 422)
-
-
-@app.exception_handler(CalculatorExecutionError)
-async def handle_calculator_execution(
-    _: Request,
-    exc: CalculatorExecutionError,
-) -> JSONResponse:
-    """Handle unexpected calculator execution failures.
-
-    Args:
-        _: Incoming FastAPI request.
-        exc: Raised application error.
-
-    Returns:
-        JSONResponse: HTTP 500 error response.
-    """
-
-    return build_error_response(exc, 500)
-
-
-@app.exception_handler(CovenantRegistryConfigurationError)
-async def handle_covenant_registry_configuration(
-    _: Request,
-    exc: CovenantRegistryConfigurationError,
-) -> JSONResponse:
-    """Handle missing or invalid smart contract configuration.
-
-    Args:
-        _: Incoming FastAPI request.
-        exc: Raised application error.
-
-    Returns:
-        JSONResponse: HTTP 500 error response.
-    """
-
-    return build_error_response(exc, 500)
-
-
-@app.exception_handler(CovenantPublicationError)
-async def handle_covenant_publication(
-    _: Request,
-    exc: CovenantPublicationError,
-) -> JSONResponse:
-    """Handle smart contract publication failures.
-
-    Args:
-        _: Incoming FastAPI request.
-        exc: Raised application error.
-
-    Returns:
-        JSONResponse: HTTP 500 error response.
-    """
-
-    return build_error_response(exc, 500)
-
-
-@app.exception_handler(CovenantReportNotFoundError)
-async def handle_covenant_report_not_found(
-    _: Request,
-    exc: CovenantReportNotFoundError,
-) -> JSONResponse:
-    """Handle missing on-chain covenant reports.
-
-    Args:
-        _: Incoming FastAPI request.
-        exc: Raised application error.
-
-    Returns:
-        JSONResponse: HTTP 404 error response.
-    """
-
-    return build_error_response(exc, 404)
-
-
-@app.exception_handler(CovenantRegistryReadError)
-async def handle_covenant_registry_read(
-    _: Request,
-    exc: CovenantRegistryReadError,
-) -> JSONResponse:
-    """Handle smart contract read failures.
-
-    Args:
-        _: Incoming FastAPI request.
-        exc: Raised application error.
-
-    Returns:
-        JSONResponse: HTTP 500 error response.
-    """
-
-    return build_error_response(exc, 500)
+    logger.opt(exception=exc).error(
+        "Request failed with unhandled exception {method} {path}",
+        method=request.method,
+        path=request.url.path,
+    )
+    return build_error_response(UnhandledApplicationError())
 
 
 @app.get("/", tags=["meta"])

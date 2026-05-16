@@ -966,3 +966,92 @@ session responses, rather than reduced to short summaries.
   lets commit the changes
 - Agent
   Used the commit workflow to review the staged Docker, readiness, quickstart, README, and transcript changes. Added the current transcript entry and created a focused Conventional Commits-style commit for the local development startup improvements.
+
+## Entry 049
+- Timestamp: 2026-05-16 14:03:00 CEST
+- Type: development
+- Status: completed
+- Human
+  Lets do a plan for a couple of improvements:
+
+  * From the original idea dispatcher has changed its focus to be more of a validator/resolver, lets update this to be semantically more correct
+  * In the covenant handler, publish should be its own method and then used in calculate_and_publish, update tests for this
+  * Lets update the calculate_and_publish so the calculation is done in a thread using anyio, do not modificy calculate method, add tests
+  * publish_facility_report in web3 could use the call method for simplicity in im not wrong
+  * backend/core/clients/contract_abi.py is more of a utils than a core client lets create a utils in core
+  * For covenant results use decimal instead of float, check the schemas
+  * Logging is non existant currently. dispather (resolver) should say which facility it has detected, calculators should have debug logs in order to check specific calculations, covenant handler should log which process is doing and when it finishes (calcuilation or pusblish), check more logs that can be helpful (all levels)
+  * Exception handlers are a bit verbose, lets think if we can group errors for specific exceptions (400, 404, 422, 500), create base exceptions there and recude the amount of handlers
+  * Create a catch-all handler for unregistered exceptions that follows the same pattern. Make sure that exceptions do not overshare like InvalidFacilityHeaderError it should not output the allowed values as this could mean that external people can get that information that should be private
+  * Add asgi-correlation-id dependency and add the middleware, this request ID should be then logged like [request_id] in the logs for easy tracking. Also it should be returned in the all the requests as x-fence-request-id
+  * Remove aiosqlite as we are using the smart contract finally
+- Agent
+  Produced an implementation plan for the requested backend improvements. Recommended a semantic rename from dispatcher to resolver, adding a standalone `publish` method and threaded `calculate_and_publish`, keeping the web3 write path as a real transaction rather than replacing it with `.call()`, moving ABI helpers to `core/utils`, using `Decimal` for covenant rates with string JSON serialization, adding request-id correlation and richer logging, consolidating exception handlers around base exception groups, adding a safe catch-all handler, and removing `aiosqlite`.
+
+  The plan included a concrete test flow covering calculation, publication, registry reads, request-id headers, sanitized errors, and the new catch-all handler.
+
+## Entry 050
+- Timestamp: 2026-05-16 14:21:00 CEST
+- Type: development
+- Status: aborted
+- Human
+  * Do not add call, dont do any change for point 3
+  * Apply recommndtaion for poinnt 5
+
+  Lets implement
+- Agent
+  Started the implementation and was interrupted before completion. Partial work included renaming the dispatcher module to resolver, adding `CovenantHandler.publish`, updating `calculate_and_publish` to use `anyio.to_thread.run_sync`, converting covenant result rates to `Decimal`, moving the contract ABI helper into `core/utils`, adding grouped exception classes and a catch-all error shape, adding correlation-id middleware and log formatting, removing `aiosqlite` from project dependencies, and beginning test updates.
+
+  The turn was aborted while resolving the new `asgi-correlation-id` dependency because the local `UV_EXTRA_INDEX_URL` pointed to a private Artifact Registry requiring refreshed gcloud credentials.
+
+## Entry 051
+- Timestamp: 2026-05-16 14:36:49 CEST
+- Type: development
+- Status: completed
+- Human
+  Resume the work
+- Agent
+  Completed the interrupted implementation. Finished the resolver rename, standalone publish flow, threaded calculation path, Decimal response model conversion with string JSON serialization, ABI utility relocation, request-id middleware and `[request_id]` log formatting, grouped exception handling with sanitized public details, catch-all 500 handling, and dependency changes replacing `aiosqlite` with `asgi-correlation-id`.
+
+  Updated unit, integration, and e2e tests for the resolver naming, standalone publication, anyio thread execution, Decimal JSON responses, sanitized invalid facility errors, request-id headers, and safe catch-all responses.
+
+  Verification passed:
+  - `env UV_EXTRA_INDEX_URL= UV_KEYRING_PROVIDER=disabled uv lock --project backend --default-index https://pypi.org/simple`
+  - `env UV_EXTRA_INDEX_URL= UV_KEYRING_PROVIDER=disabled uv sync --project backend`
+  - `rtk uv run ruff check .`
+  - `rtk uv run ruff format --check .`
+  - `rtk uv run ty check .`
+  - `rtk uv run pytest`
+
+  The full backend test run reported 54 passing tests with one dependency deprecation warning from `websockets.legacy`.
+
+## Entry 052
+- Timestamp: 2026-05-16 14:44:31 CEST
+- Type: development
+- Status: completed
+- Human
+  * Add log level environment variable in settings
+  * Covenant result response should not return updated by
+- Agent
+  Added an explicit `LogLevel` enum to settings so `FENCE_LOG_LEVEL` is parsed as a constrained environment-backed setting instead of a free-form string. Updated app logging setup to pass the enum value into the logger configuration.
+
+  Removed `updated_by` from the on-chain covenant result response schema and from both the real contract mapping and fake registry test client. Added tests for `FENCE_LOG_LEVEL` parsing and for ensuring the covenant result endpoint does not include `updated_by`.
+
+  Also fixed test startup isolation so fake-registry integration tests stub only the startup RPC readiness check, while the real e2e on-chain test points startup readiness at its temporary Anvil RPC.
+
+  Verification passed:
+  - `rtk uv run ruff check .`
+  - `rtk uv run ruff format --check .`
+  - `rtk uv run ty check .`
+  - `rtk uv run pytest`
+
+  The full backend test run reported 55 passing tests with one dependency deprecation warning from `websockets.legacy`.
+
+## Entry 053
+- Timestamp: 2026-05-16 14:46:50 CEST
+- Type: clean-up
+- Status: completed
+- Human
+  Lets create a commit and a meaningful message
+- Agent
+  Reviewed the current dirty tree, confirmed the changes are the backend resolver refactor, covenant publish/threading updates, Decimal response changes, logging and exception cleanup, ABI utility move, dependency refresh, and the related test updates. Appended this transcript entry and created a Conventional Commits-style commit with a concise scope and summary for the overall backend refactor.

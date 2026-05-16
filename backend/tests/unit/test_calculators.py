@@ -32,7 +32,7 @@ def test_educa_calculator_returns_breach_when_threshold_is_met() -> None:
 
     result = EducaCalculator(Decimal("22.0")).calculate(portfolio)
 
-    assert result.computed_effective_rate == 22.0
+    assert result.computed_effective_rate == Decimal("22.00")
     assert result.covenant_status == CovenantStatus.BREACH
 
 
@@ -61,7 +61,7 @@ def test_educa_calculator_handles_no_eligible_assets() -> None:
 
     result = EducaCalculator(Decimal("22.0")).calculate(portfolio)
 
-    assert result.computed_effective_rate == 0.0
+    assert result.computed_effective_rate == Decimal("0.00")
     assert result.summary.assets_included == 0
     assert result.summary.assets_excluded == 1
 
@@ -94,7 +94,7 @@ def test_payearly_calculator_uses_threshold_to_mark_breach() -> None:
 
     result = PayearlyCalculator(Decimal("0.1")).calculate(portfolio)
 
-    assert result.computed_effective_rate > 0.1
+    assert result.computed_effective_rate > Decimal("0.1")
     assert result.covenant_status == CovenantStatus.BREACH
 
 
@@ -124,7 +124,7 @@ def test_nomina_calculator_uses_threshold_to_mark_compliant() -> None:
 
     result = NominaCalculator(Decimal("20.0")).calculate(portfolio)
 
-    assert result.computed_effective_rate == 4.0
+    assert result.computed_effective_rate == Decimal("4.00")
     assert result.covenant_status == CovenantStatus.COMPLIANT
 
 

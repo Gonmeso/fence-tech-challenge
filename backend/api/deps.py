@@ -1,6 +1,6 @@
 from fastapi import Header
 
-from business.calculator.dispatcher import CalculatorDispatcher
+from business.calculator.resolver import CalculatorResolver
 from business.covenant import CovenantHandler
 from business.enums import FacilityType
 from core.clients.covenant_registry import (
@@ -38,14 +38,14 @@ def get_facility_type_header(
         ) from exc
 
 
-def get_calculator_dispatcher() -> CalculatorDispatcher:
-    """Build a calculator dispatcher with the current settings.
+def get_calculator_resolver() -> CalculatorResolver:
+    """Build a calculator resolver with the current settings.
 
     Returns:
-        CalculatorDispatcher: Dispatcher configured with current thresholds.
+        CalculatorResolver: Resolver configured with current thresholds.
     """
 
-    return CalculatorDispatcher(get_settings())
+    return CalculatorResolver(get_settings())
 
 
 def get_registry_client() -> CovenantRegistryClient:
@@ -62,10 +62,10 @@ def get_covenant_handler() -> CovenantHandler:
     """Build the covenant handler used by calculation endpoints.
 
     Returns:
-        CovenantHandler: Handler wired with a calculator dispatcher.
+        CovenantHandler: Handler wired with a calculator resolver.
     """
 
     return CovenantHandler(
-        dispatcher=get_calculator_dispatcher(),
+        resolver=get_calculator_resolver(),
         registry_client=get_registry_client(),
     )

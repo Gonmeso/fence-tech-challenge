@@ -4,7 +4,7 @@ from decimal import Decimal
 import pytest
 
 from business.calculator import (
-    CalculatorDispatcher,
+    CalculatorResolver,
     EducaCalculator,
     NominaCalculator,
     PayearlyCalculator,
@@ -18,8 +18,8 @@ from core.exceptions import (
 from core.settings import Settings
 
 
-def test_dispatcher_returns_educa_calculator_for_educa_payload() -> None:
-    dispatcher = CalculatorDispatcher(
+def test_resolver_returns_educa_calculator_for_educa_payload() -> None:
+    resolver = CalculatorResolver(
         Settings(
             educa_covenant_threshold=Decimal("21.5"),
             payearly_covenant_threshold=Decimal("3.0"),
@@ -48,18 +48,18 @@ def test_dispatcher_returns_educa_calculator_for_educa_payload() -> None:
         ]
     )
 
-    dispatched = dispatcher.dispatch(
+    resolved = resolver.resolve(
         facility_type=FacilityType.EDUCA,
         payload=payload,
     )
 
-    assert dispatched.facility_type == FacilityType.EDUCA
-    assert isinstance(dispatched.calculator, EducaCalculator)
-    assert dispatched.calculator.threshold == Decimal("21.5")
+    assert resolved.facility_type == FacilityType.EDUCA
+    assert isinstance(resolved.calculator, EducaCalculator)
+    assert resolved.calculator.threshold == Decimal("21.5")
 
 
-def test_dispatcher_returns_payearly_calculator_for_payearly_payload() -> None:
-    dispatcher = CalculatorDispatcher(Settings())
+def test_resolver_returns_payearly_calculator_for_payearly_payload() -> None:
+    resolver = CalculatorResolver(Settings())
     payload = [
         {
             "external_id": "PAY-1",
@@ -83,7 +83,7 @@ def test_dispatcher_returns_payearly_calculator_for_payearly_payload() -> None:
         }
     ]
 
-    calculator = dispatcher.dispatch(
+    calculator = resolver.resolve(
         facility_type=FacilityType.PAYEARLY,
         payload=payload,
     ).calculator
@@ -92,8 +92,8 @@ def test_dispatcher_returns_payearly_calculator_for_payearly_payload() -> None:
     assert calculator.threshold == Decimal("3.0")
 
 
-def test_dispatcher_returns_nomina_calculator_for_nomina_payload() -> None:
-    dispatcher = CalculatorDispatcher(Settings())
+def test_resolver_returns_nomina_calculator_for_nomina_payload() -> None:
+    resolver = CalculatorResolver(Settings())
     payload = json.dumps(
         [
             {
@@ -117,38 +117,38 @@ def test_dispatcher_returns_nomina_calculator_for_nomina_payload() -> None:
         ]
     )
 
-    dispatched = dispatcher.dispatch(
+    resolved = resolver.resolve(
         facility_type=FacilityType.NOMINA,
         payload=payload,
     )
 
-    assert dispatched.facility_type == FacilityType.NOMINA
-    assert isinstance(dispatched.calculator, NominaCalculator)
-    assert dispatched.calculator.threshold == Decimal("5.0")
+    assert resolved.facility_type == FacilityType.NOMINA
+    assert isinstance(resolved.calculator, NominaCalculator)
+    assert resolved.calculator.threshold == Decimal("5.0")
 
 
-def test_dispatcher_rejects_invalid_json() -> None:
-    dispatcher = CalculatorDispatcher(Settings())
+def test_resolver_rejects_invalid_json() -> None:
+    resolver = CalculatorResolver(Settings())
 
     with pytest.raises(InvalidJsonPayloadError, match="Payload is not valid JSON"):
-        dispatcher.dispatch(
+        resolver.resolve(
             facility_type=FacilityType.EDUCA,
             payload="{not-json}",
         )
 
 
-def test_dispatcher_rejects_non_array_json() -> None:
-    dispatcher = CalculatorDispatcher(Settings())
+def test_resolver_rejects_non_array_json() -> None:
+    resolver = CalculatorResolver(Settings())
 
     with pytest.raises(InvalidPayloadTypeError, match="Payload must be a JSON array"):
-        dispatcher.dispatch(
+        resolver.resolve(
             facility_type=FacilityType.EDUCA,
             payload='{"external_id":"EDU-1"}',
         )
 
 
-def test_dispatcher_rejects_payload_for_declared_facility() -> None:
-    dispatcher = CalculatorDispatcher(Settings())
+def test_resolver_rejects_payload_for_declared_facility() -> None:
+    resolver = CalculatorResolver(Settings())
     payload = json.dumps(
         [
             {
@@ -165,7 +165,7 @@ def test_dispatcher_rejects_payload_for_declared_facility() -> None:
         FacilityPayloadValidationError,
         match="Payload does not match the declared facility schema",
     ):
-        dispatcher.dispatch(
+        resolver.resolve(
             facility_type=FacilityType.EDUCA,
             payload=payload,
         )

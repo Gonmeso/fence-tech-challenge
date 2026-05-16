@@ -1,4 +1,9 @@
-from business.calculator.dispatcher import CalculatorDispatcher
+from functools import partial
+
+from anyio.to_thread import run_sync
+from loguru import logger
+
+from business.calculator.resolver import CalculatorResolver
 from business.enums import FacilityType
 from core.clients.covenant_registry import CovenantRegistryClient
 from core.exceptions import CalculatorExecutionError
@@ -10,17 +15,17 @@ class CovenantHandler:
 
     def __init__(
         self,
-        dispatcher: CalculatorDispatcher,
+        resolver: CalculatorResolver,
         registry_client: CovenantRegistryClient | None = None,
     ) -> None:
-        """Store the dispatcher used to resolve facility calculators.
+        """Store the resolver used to validate facility calculator inputs.
 
         Args:
-            dispatcher: Dispatcher that validates payloads and selects calculators.
+            resolver: Resolver that validates payloads and selects calculators.
             registry_client: Optional smart contract client for publication and reads.
         """
 
-        self._dispatcher = dispatcher
+        self._resolver = resolver
         self._registry_client = registry_client
 
     def calculate(
@@ -42,19 +47,73 @@ class CovenantHandler:
             CovenantResult: Calculated covenant response.
         """
 
-        dispatched = self._dispatcher.dispatch(
+        resolved = self._resolver.resolve(
             facility_type=facility_type,
             payload=payload,
         )
 
         try:
-            return dispatched.calculator.calculate(dispatched.portfolio)
+            logger.info(
+                "Starting covenant calculation for {facility_type}",
+                facility_type=facility_type.value,
+            )
+            result = resolved.calculator.calculate(resolved.portfolio)
+            logger.info(
+                "Finished covenant calculation for {facility_type}",
+                facility_type=facility_type.value,
+            )
+            return result
         except Exception as exc:  # pragma: no cover - defensive boundary
             msg = "Calculator execution failed"
             raise CalculatorExecutionError(
-                details=[{"facility_type": facility_type.value, "error": str(exc)}],
+                details=[{"facility_type": facility_type.value}],
+                private_details=[{"facility_type": facility_type.value, "error": str(exc)}],
                 message=msg,
             ) from exc
+
+    async def publish(
+        self,
+        *,
+        facility_type: FacilityType,
+        result: CovenantResult,
+    ) -> CovenantPublishedResult:
+        """Publish a calculated covenant result on-chain.
+
+        Args:
+            facility_type: Declared facility type for the calculated result.
+            result: Covenant result to publish.
+
+        Raises:
+            CalculatorExecutionError: If the registry client is not configured.
+
+        Returns:
+            CovenantPublishedResult: Covenant result with publication metadata.
+        """
+
+        if self._registry_client is None:  # pragma: no cover - dependency guard
+            msg = "Covenant registry client is not configured"
+            raise CalculatorExecutionError(
+                details=[{"facility_type": facility_type.value}],
+                message=msg,
+            )
+
+        logger.info(
+            "Starting covenant publication for {facility_type}",
+            facility_type=facility_type.value,
+        )
+        publication = await self._registry_client.publish_facility_report(
+            facility_type=facility_type,
+            result=result,
+        )
+        logger.info(
+            "Finished covenant publication for {facility_type} with transaction {transaction_hash}",
+            facility_type=facility_type.value,
+            transaction_hash=publication.transaction_hash,
+        )
+        return CovenantPublishedResult(
+            **result.model_dump(),
+            publication=publication,
+        )
 
     async def calculate_and_publish(
         self,
@@ -75,23 +134,15 @@ class CovenantHandler:
             CovenantPublishedResult: Covenant result with publication metadata.
         """
 
-        # If the payload were big, this should run in a threadpool to avoid blocking the event loop.
-        # For simplicity, we assume it's small enough to not require that.
-        result = self.calculate(facility_type=facility_type, payload=payload)
-        if self._registry_client is None:  # pragma: no cover - dependency guard
-            msg = "Covenant registry client is not configured"
-            raise CalculatorExecutionError(
-                details=[{"facility_type": facility_type.value}],
-                message=msg,
-            )
-
-        publication = await self._registry_client.publish_facility_report(
+        calculate = partial(
+            self.calculate,
+            facility_type=facility_type,
+            payload=payload,
+        )
+        result = await run_sync(calculate)
+        return await self.publish(
             facility_type=facility_type,
             result=result,
-        )
-        return CovenantPublishedResult(
-            **result.model_dump(),
-            publication=publication,
         )
 
     async def get_published_result(
@@ -114,4 +165,8 @@ class CovenantHandler:
                 details=[{"facility_type": facility_type.value}],
                 message=msg,
             )
+        logger.info(
+            "Reading published covenant result for {facility_type}",
+            facility_type=facility_type.value,
+        )
         return await self._registry_client.get_facility_report(facility_type=facility_type)

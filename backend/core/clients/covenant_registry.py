@@ -3,10 +3,10 @@ from decimal import ROUND_HALF_UP, Decimal
 from typing import Any, Protocol
 
 from eth_account import Account
+from loguru import logger
 from web3 import AsyncHTTPProvider, AsyncWeb3
 
 from business.enums import FacilityType
-from core.clients.contract_abi import load_registry_abi
 from core.exceptions import (
     CovenantPublicationError,
     CovenantRegistryConfigurationError,
@@ -14,6 +14,7 @@ from core.exceptions import (
     CovenantReportNotFoundError,
 )
 from core.settings import Settings
+from core.utils.contract_abi import load_registry_abi
 from schemas.covenant import (
     CovenantPublication,
     CovenantResult,
@@ -111,6 +112,10 @@ class AsyncCovenantRegistryClient:
         """
 
         try:
+            logger.info(
+                "Publishing covenant report to registry for {facility_type}",
+                facility_type=facility_type.value,
+            )
             function = self._contract.functions.updateFacilityReport(
                 facility_type.value,
                 _rate_to_bps(result.computed_effective_rate),
@@ -134,7 +139,8 @@ class AsyncCovenantRegistryClient:
             receipt = await self._web3.eth.wait_for_transaction_receipt(transaction_hash)
         except Exception as exc:
             raise CovenantPublicationError(
-                details=[{"facility_type": facility_type.value, "error": str(exc)}],
+                details=[{"facility_type": facility_type.value}],
+                private_details=[{"facility_type": facility_type.value, "error": str(exc)}],
             ) from exc
 
         if receipt.get("status") != 1:
@@ -147,6 +153,11 @@ class AsyncCovenantRegistryClient:
                 ],
             )
 
+        logger.info(
+            "Published covenant report to registry for {facility_type} in transaction {hash}",
+            facility_type=facility_type.value,
+            hash=_hex_with_prefix(transaction_hash.hex()),
+        )
         return CovenantPublication(
             chain_id=self.chain_id,
             contract_address=self.contract_address,
@@ -168,6 +179,10 @@ class AsyncCovenantRegistryClient:
         """
 
         try:
+            logger.info(
+                "Reading covenant report from registry for {facility_type}",
+                facility_type=facility_type.value,
+            )
             exists = await self._contract.functions.reportExists(facility_type.value).call()
             if not exists:
                 raise CovenantReportNotFoundError(facility_type=facility_type)
@@ -176,7 +191,8 @@ class AsyncCovenantRegistryClient:
             raise
         except Exception as exc:
             raise CovenantRegistryReadError(
-                details=[{"facility_type": facility_type.value, "error": str(exc)}],
+                details=[{"facility_type": facility_type.value}],
+                private_details=[{"facility_type": facility_type.value, "error": str(exc)}],
             ) from exc
 
         return _report_to_schema(
@@ -239,10 +255,12 @@ def get_covenant_registry_client(settings: Settings) -> AsyncCovenantRegistryCli
     """
 
     if not settings.covenant_registry_address:
-        raise CovenantRegistryConfigurationError(details=[{"missing": "covenant_registry_address"}])
+        raise CovenantRegistryConfigurationError(
+            private_details=[{"missing": "covenant_registry_address"}],
+        )
     if not settings.covenant_registry_private_key:
         raise CovenantRegistryConfigurationError(
-            details=[{"missing": "covenant_registry_private_key"}],
+            private_details=[{"missing": "covenant_registry_private_key"}],
         )
 
     config = CovenantRegistryClientConfig(
@@ -265,17 +283,17 @@ def reset_covenant_registry_clients() -> None:
     _client_registry.reset()
 
 
-def _rate_to_bps(rate: float) -> int:
+def _rate_to_bps(rate: Decimal) -> int:
     """Convert a percentage rate to basis points.
 
     Args:
-        rate: Percentage rate from the covenant calculation.
+        rate: Decimal percentage rate from the covenant calculation.
 
     Returns:
         int: Rate represented in basis points.
     """
 
-    return int((Decimal(str(rate)) * Decimal("100")).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+    return int((rate * Decimal("100")).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
 
 
 def _hex_with_prefix(value: str) -> str:
@@ -338,7 +356,7 @@ def _report_to_schema(
     return OnChainCovenantResult(
         facility=report[0],
         effective_rate_bps=effective_rate_bps,
-        computed_effective_rate=effective_rate_bps / 100,
+        computed_effective_rate=Decimal(effective_rate_bps) / Decimal("100"),
         covenant_status=_status_from_contract_value(int(report[2])),
         summary=CovenantSummary(
             total_assets_evaluated=int(report[3]),
@@ -348,7 +366,6 @@ def _report_to_schema(
         included_assets=list(report[6]),
         excluded_assets=list(report[7]),
         updated_at=int(report[8]),
-        updated_by=report[9],
         exists=bool(report[10]),
         chain_id=chain_id,
         contract_address=contract_address,
