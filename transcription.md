@@ -1055,3 +1055,29 @@ session responses, rather than reduced to short summaries.
   Lets create a commit and a meaningful message
 - Agent
   Reviewed the current dirty tree, confirmed the changes are the backend resolver refactor, covenant publish/threading updates, Decimal response changes, logging and exception cleanup, ABI utility move, dependency refresh, and the related test updates. Appended this transcript entry and created a Conventional Commits-style commit with a concise scope and summary for the overall backend refactor.
+
+## Entry 054
+- Timestamp: 2026-05-16 14:57:56 CEST
+- Type: development
+- Status: completed
+- Human
+  Okey lets plan:
+
+  * To fix the unicode error
+  * Create invariant tests for the calculations
+  * Fix the healthcheck test error due to .env existing locally, we should make sure that tests are not affected by the .env
+- Agent
+  Implemented the plan with a narrow backend-only change set. The resolver now maps invalid UTF-8 bytes to `InvalidJsonPayloadError`, the calculators have invariant tests proving that extra ineligible assets and unused field changes do not alter the computed rate or covenant status, and the health test now uses a dedicated fixture-built app with explicit test settings so local `.env` files do not affect the test environment.
+
+  Verification passed for `rtk uv run ruff check .`, `rtk uv run ty check .`, and the focused resolver/calculator/health test slice. The tests reported 15 passing cases with one `websockets.legacy` deprecation warning.
+
+## Entry 055
+- Timestamp: 2026-05-16 15:00:45 CEST
+- Type: development
+- Status: completed
+- Human
+  This test keeps failing: backend/tests/integration/test_health_api.py::test_health_endpoint_returns_expected_payload
+- Agent
+  Fixed the remaining health-test isolation bug by patching the module-level `get_settings` reference used by the health endpoint itself, not just `main`. The dedicated `test_app` fixture now also overrides `api.v1.endpoints.health.get_settings`, so the health response is decoupled from the local `.env` file during tests.
+
+  Verified the health test passes with the fixture-backed app, and reran the relevant lint and type checks on the touched files.

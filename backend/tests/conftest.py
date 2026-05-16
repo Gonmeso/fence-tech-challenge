@@ -8,13 +8,14 @@ from fastapi.testclient import TestClient
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+import api.v1.endpoints.health as health_endpoint
 import main as app_module
 from api.deps import get_covenant_handler
 from business.calculator.resolver import CalculatorResolver
 from business.covenant import CovenantHandler
 from business.enums import FacilityType
 from core.exceptions import CovenantReportNotFoundError
-from core.settings import Settings
+from core.settings import Settings, SettingsConfigDict
 from main import app
 from schemas.covenant import (
     CovenantPublication,
@@ -118,6 +119,63 @@ def settings() -> Settings:
 @pytest.fixture
 def fake_registry_client() -> FakeCovenantRegistryClient:
     return FakeCovenantRegistryClient()
+
+
+@pytest.fixture
+def test_settings() -> Settings:
+    """Return explicit settings that do not load values from `.env`.
+
+    Returns:
+        Settings: Test-only settings with stable defaults.
+    """
+
+    class TestSettings(Settings):
+        """Settings subclass that never reads from `.env`."""
+
+        model_config = SettingsConfigDict(
+            env_file=None,
+            env_prefix="FENCE_",
+            case_sensitive=False,
+        )
+
+    return TestSettings(
+        educa_covenant_threshold=Decimal("22.0"),
+        payearly_covenant_threshold=Decimal("3.0"),
+        nomina_covenant_threshold=Decimal("5.0"),
+    )
+
+
+@pytest.fixture
+def test_app(
+    monkeypatch: pytest.MonkeyPatch,
+    test_settings: Settings,
+    fake_registry_client: FakeCovenantRegistryClient,
+) -> Iterator[TestClient]:
+    """Build a FastAPI test client that ignores local `.env` files.
+
+    Args:
+        monkeypatch: Pytest helper for patching module state.
+        test_settings: Explicit settings fixture that bypasses `.env`.
+        fake_registry_client: In-memory registry client used by API tests.
+
+    Returns:
+        Iterator[TestClient]: FastAPI client with isolated settings.
+    """
+
+    def build_handler() -> CovenantHandler:
+        return CovenantHandler(
+            resolver=CalculatorResolver(test_settings),
+            registry_client=fake_registry_client,
+        )
+
+    monkeypatch.setattr(app_module, "settings", test_settings)
+    monkeypatch.setattr(app_module, "get_settings", lambda: test_settings)
+    monkeypatch.setattr(app_module, "check_rpc_connection", lambda *_args, **_kwargs: 31337)
+    monkeypatch.setattr(health_endpoint, "get_settings", lambda: test_settings)
+    app.dependency_overrides[get_covenant_handler] = build_handler
+    with TestClient(app) as client:
+        yield client
+    app.dependency_overrides.clear()
 
 
 @pytest.fixture

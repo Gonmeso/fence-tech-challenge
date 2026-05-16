@@ -137,6 +137,16 @@ def test_resolver_rejects_invalid_json() -> None:
         )
 
 
+def test_resolver_rejects_invalid_utf8_bytes() -> None:
+    resolver = CalculatorResolver(Settings())
+
+    with pytest.raises(InvalidJsonPayloadError, match="Payload is not valid JSON"):
+        resolver.resolve(
+            facility_type=FacilityType.EDUCA,
+            payload=b"\xff",
+        )
+
+
 def test_resolver_rejects_non_array_json() -> None:
     resolver = CalculatorResolver(Settings())
 

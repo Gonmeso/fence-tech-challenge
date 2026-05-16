@@ -121,7 +121,10 @@ class CalculatorResolver:
         if isinstance(payload, list):
             return payload
         if isinstance(payload, bytes):
-            payload = payload.decode()
+            try:
+                payload = payload.decode()
+            except UnicodeDecodeError as exc:
+                raise InvalidJsonPayloadError() from exc
 
         try:
             parsed_payload = json.loads(payload)
