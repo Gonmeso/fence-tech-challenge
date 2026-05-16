@@ -76,7 +76,7 @@ Current local stack:
 Clone with submodules:
 
 ```bash
-git clone --recurse-submodules <repo_url>
+git clone --recurse-submodules git@github.com:Gonmeso/fence-tech-challenge.git
 cd fence-tech-challenge
 ```
 
