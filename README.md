@@ -35,9 +35,9 @@ challenge. The system is being designed around two connected projects:
 
 ## How The Covenant Model Influenced The Architecture
 
-- The requirement to publish verifiable outputs on-chain drove a hard split between calculation (Python, per-facility) and publication (normalized on-chain snapshot), rather than mixing them in a single handler.
-- Independent verifiability of the covenant result led to a dedicated GET endpoint that reads back the on-chain snapshot, so all parties can confirm the published data matches the calculated output.
 - Single endpoint vs multiple endpoints was a key design choice influenced by the need to support multiple facility types without proliferating routes; the header-based routing allows for a clean separation of logic while keeping the API surface minimal.
+- Independent verifiability of the covenant result led to a dedicated GET endpoint that reads back the on-chain snapshot, so all parties can confirm the published data matches the calculated output.
+- The need for a clear data contract between the API and the smart contract influenced the use of Pydantic models and a normalized output format that can be easily serialized and stored on-chain.
 
 
 ## Trade-Offs
@@ -54,7 +54,7 @@ challenge. The system is being designed around two connected projects:
 
 - The smart contract should be its own repository with a clear versioning and deployment strategy; for this challenge it is included as a submodule, but it should not live alongside the backend code long-term.
 - Add a CI/CD pipeline for automated testing, linting, and deployment.
-- Better monitoring and observability with structured logging, metrics, and tracing (Sentry, ELK).
+- Better monitoring and observability with structured logging, metrics, and tracing (Sentry, OpenTelemetry).
 - Implement authentication and authorization for the API and smart contract interactions.
 - Smart contract security audits and formal verification for critical components.
 - Better exception handling at the smart contract level.
