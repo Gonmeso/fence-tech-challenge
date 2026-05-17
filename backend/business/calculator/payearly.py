@@ -33,7 +33,7 @@ class PayearlyCalculator(BaseCalculator[PayearlyPortfolio]):
             for asset in included_assets
         )
         denominator = sum(asset.outstanding_principal_amount for asset in included_assets)
-        computed_rate = numerator / denominator if denominator else Decimal("0")
+        computed_rate = (numerator / denominator * Decimal("100")) if denominator else Decimal("0")
         logger.debug(
             "Payearly effective rate inputs: total_assets={total_assets}, "
             "included_assets={included_assets}, numerator={numerator}, denominator={denominator}, "
