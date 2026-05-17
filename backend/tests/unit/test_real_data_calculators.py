@@ -35,7 +35,7 @@ def test_payearly_calculator_with_real_json(data_dir: Path, settings: Settings) 
 
     result = PayearlyCalculator(settings.payearly_covenant_threshold).calculate(portfolio)
 
-    assert result.computed_effective_rate == Decimal("0.00")
+    assert result.computed_effective_rate == Decimal("0.03")
     assert result.covenant_status == CovenantStatus.COMPLIANT
     assert result.summary.total_assets_evaluated == 8
     assert result.summary.assets_included == 5

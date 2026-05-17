@@ -1,3 +1,4 @@
+import asyncio
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any, Protocol
@@ -65,6 +66,9 @@ class CovenantRegistryClient(Protocol):
             OnChainCovenantResult: Latest report stored on-chain.
         """
 
+    async def disconnect(self) -> None:
+        """Release any network resources held by the client."""
+
 
 @dataclass(frozen=True)
 class CovenantRegistryClientConfig:
@@ -90,9 +94,15 @@ class AsyncCovenantRegistryClient:
         self.chain_id = config.chain_id
         checksum_address = AsyncWeb3.to_checksum_address(config.contract_address)
         self.contract_address = str(checksum_address)
-        self._web3 = AsyncWeb3(AsyncHTTPProvider(config.rpc_url))
+        self._provider = AsyncHTTPProvider(config.rpc_url)
+        self._web3 = AsyncWeb3(self._provider)
         self._account = Account.from_key(config.private_key)
         self._contract = self._web3.eth.contract(address=checksum_address, abi=config.abi)
+
+    async def disconnect(self) -> None:
+        """Close provider-managed HTTP sessions."""
+
+        await self._provider.disconnect()
 
     async def publish_facility_report(
         self,
@@ -229,14 +239,33 @@ class CovenantRegistryClientRegistry:
             self._clients[config.chain_id] = AsyncCovenantRegistryClient(config)
         return self._clients[config.chain_id]
 
+    async def aclose(self) -> None:
+        """Close cached clients and release their provider resources."""
+
+        await asyncio.gather(
+            *(client.disconnect() for client in self._clients.values()),
+            return_exceptions=True,
+        )
+        self._clients.clear()
+
     def reset(self) -> None:
-        """Clear cached clients.
+        """Close and clear cached clients.
 
         Returns:
-            None: Empties the registry.
+            None: Empties the registry after closing open sessions.
         """
 
-        self._clients.clear()
+        if not self._clients:
+            return
+
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            asyncio.run(self.aclose())
+            return
+
+        msg = "Cannot synchronously reset covenant registry clients inside a running event loop"
+        raise RuntimeError(msg)
 
 
 _client_registry = CovenantRegistryClientRegistry()
@@ -282,6 +311,12 @@ def reset_covenant_registry_clients() -> None:
     """
 
     _client_registry.reset()
+
+
+async def close_covenant_registry_clients() -> None:
+    """Close the global chain client registry asynchronously."""
+
+    await _client_registry.aclose()
 
 
 def _rate_to_bps(rate: Decimal) -> int:

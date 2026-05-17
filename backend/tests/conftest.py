@@ -123,6 +123,13 @@ class FakeCovenantRegistryClient:
         except KeyError as exc:
             raise CovenantReportNotFoundError(facility_type=facility_type) from exc
 
+    async def disconnect(self) -> None:
+        """Release fake client resources.
+
+        Returns:
+            None: The in-memory fake client has no network resources to close.
+        """
+
 
 @pytest.fixture
 def settings() -> Settings:

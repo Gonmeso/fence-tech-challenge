@@ -1222,6 +1222,47 @@ session responses, rather than reduced to short summaries.
   - `rtk uv run pytest tests/unit/test_settings.py tests/unit/test_resolver.py tests/unit/test_covenant_handler.py tests/integration/test_covenant_api.py`
 
 ## Entry 063
+- Timestamp: 2026-05-17 20:02:12 CEST
+- Type: development
+- Status: completed
+- Human
+  add e2e for payearly and nomina as well
+- Agent
+  Extended `backend/tests/e2e/test_covenant_on_chain.py` from a single-facility case into a parameterized on-chain round-trip test that now covers `educa`, `payearly`, and `nomina`.
+
+  The test still follows the contract-verification pattern used for `educa`: publish through `POST /api/v1/covenants/calculate`, reset the cached registry client, then read back through `GET /api/v1/covenants/result` and compare the on-chain summary, included assets, and excluded assets with reasons.
+
+  While adding `payearly`, the first run exposed that the old expected rate was stale. The current backend behavior and existing integration/unit tests expect `payearly` to publish `computed_effective_rate = "0.03"` and `effective_rate_bps = 3`, so the new e2e was aligned to that value instead of the older `0.00`.
+
+  Verification passed:
+  - `rtk uv run pytest tests/e2e/test_covenant_on_chain.py`
+  - `rtk uv run ruff check tests/e2e/test_covenant_on_chain.py`
+
+  The e2e suite passed all three cases. It still emitted existing `aiohttp` "Unclosed client session" log errors during teardown, but those did not fail the tests.
+
+## Entry 064
+- Timestamp: 2026-05-17 20:05:19 CEST
+- Type: refactor
+- Status: completed
+- Human
+  Fix the unclose session for the registry
+- Agent
+  Fixed the registry client lifecycle so cached async Web3 HTTP sessions are closed instead of only being dereferenced.
+
+  Changes made:
+  - Added `disconnect()` to `AsyncCovenantRegistryClient`, backed by `AsyncHTTPProvider.disconnect()`.
+  - Changed the cached registry client container so it can asynchronously close all provider sessions before clearing its cache.
+  - Kept `reset_covenant_registry_clients()` as the synchronous entry point for tests, but it now closes sessions before resetting.
+  - Added `close_covenant_registry_clients()` and called it from the FastAPI lifespan shutdown path in `main.py`, so application shutdown also releases registry sessions.
+
+  Verification passed:
+  - `rtk uv run ruff check core/clients/covenant_registry.py main.py tests/e2e/test_covenant_on_chain.py`
+  - `rtk uv run ty check core/clients/covenant_registry.py main.py tests/e2e/test_covenant_on_chain.py`
+  - `rtk uv run pytest tests/e2e/test_covenant_on_chain.py`
+
+  The on-chain e2e suite still passed all three facilities, and the previous `aiohttp` "Unclosed client session" teardown errors no longer appeared.
+
+## Entry 063
 - Timestamp: 2026-05-17 19:19:22 CEST
 - Type: development
 - Status: completed

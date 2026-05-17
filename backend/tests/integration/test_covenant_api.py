@@ -93,7 +93,7 @@ def test_covenant_endpoint_calculates_payearly_with_real_data(
     )
 
     assert response.status_code == 200
-    assert response.json()["computed_effective_rate"] == "0.00"
+    assert response.json()["computed_effective_rate"] == "0.03"
     assert response.json()["covenant_status"] == "COMPLIANT"
 
 

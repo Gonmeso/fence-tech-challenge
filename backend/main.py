@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse
 from loguru import logger
 
 from api.v1.router import api_router
+from core.clients.covenant_registry import close_covenant_registry_clients
 from core.clients.rpc import check_rpc_connection
 from core.exceptions import (
     FenceAppError,
@@ -45,6 +46,7 @@ async def lifespan(_: FastAPI):
         chain_id=chain_id,
     )
     yield
+    await close_covenant_registry_clients()
     logger.info("Stopping {app_name}", app_name=settings.app_name)
 
 

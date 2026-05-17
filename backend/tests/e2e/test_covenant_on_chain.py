@@ -168,32 +168,44 @@ def on_chain_api_client(
     reset_covenant_registry_clients()
 
 
+@pytest.mark.parametrize(
+    ("facility", "payload_path", "expected_rate", "expected_rate_bps"),
+    [
+        ("educa", "facility_a_educa_isa.json", "18.33", 1833),
+        ("payearly", "facility_b_payearly_ewa.json", "0.03", 3),
+        ("nomina", "facility_c_nomina.json", "3.39", 339),
+    ],
+)
 def test_api_publishes_and_reads_covenant_result_on_chain(
     on_chain_api_client: TestClient,
+    facility: str,
+    payload_path: str,
+    expected_rate: str,
+    expected_rate_bps: int,
 ) -> None:
     response = on_chain_api_client.post(
         "/api/v1/covenants/calculate",
-        content=load_json(REPO_ROOT / "data" / "facility_a_educa_isa.json"),
-        headers={"X-Fence-Facility-Type": "educa"},
+        content=load_json(REPO_ROOT / "data" / payload_path),
+        headers={"X-Fence-Facility-Type": facility},
     )
 
     assert response.status_code == 200
     published = response.json()
-    assert published["computed_effective_rate"] == "18.33"
+    assert published["computed_effective_rate"] == expected_rate
     assert published["publication"]["transaction_hash"].startswith("0x")
 
     reset_covenant_registry_clients()
 
     read_response = on_chain_api_client.get(
         "/api/v1/covenants/result",
-        headers={"X-Fence-Facility-Type": "educa"},
+        headers={"X-Fence-Facility-Type": facility},
     )
 
     assert read_response.status_code == 200
     on_chain = read_response.json()
-    assert on_chain["facility"] == "educa"
-    assert on_chain["effective_rate_bps"] == 1833
-    assert on_chain["computed_effective_rate"] == "18.33"
+    assert on_chain["facility"] == facility
+    assert on_chain["effective_rate_bps"] == expected_rate_bps
+    assert on_chain["computed_effective_rate"] == expected_rate
     assert on_chain["summary"] == published["summary"]
     assert on_chain["included_assets"] == published["included_assets"]
     assert on_chain["excluded_assets"] == published["excluded_assets"]
