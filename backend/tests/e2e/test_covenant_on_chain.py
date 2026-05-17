@@ -182,6 +182,8 @@ def test_api_publishes_and_reads_covenant_result_on_chain(
     assert published["computed_effective_rate"] == "18.33"
     assert published["publication"]["transaction_hash"].startswith("0x")
 
+    reset_covenant_registry_clients()
+
     read_response = on_chain_api_client.get(
         "/api/v1/covenants/result",
         headers={"X-Fence-Facility-Type": "educa"},
@@ -194,6 +196,4 @@ def test_api_publishes_and_reads_covenant_result_on_chain(
     assert on_chain["computed_effective_rate"] == "18.33"
     assert on_chain["summary"] == published["summary"]
     assert on_chain["included_assets"] == published["included_assets"]
-    assert on_chain["excluded_assets"] == [
-        asset["external_id"] for asset in published["excluded_assets"]
-    ]
+    assert on_chain["excluded_assets"] == published["excluded_assets"]

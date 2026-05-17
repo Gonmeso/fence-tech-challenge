@@ -31,7 +31,7 @@ git submodule update --init --recursive
 - covenant status
 - summary counts
 - included external IDs
-- excluded external IDs
+- excluded assets with external IDs and exclusion reasons
 - update timestamp
 - updating wallet
 

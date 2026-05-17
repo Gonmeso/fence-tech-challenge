@@ -21,6 +21,7 @@ from schemas.covenant import (
     CovenantPublication,
     CovenantResult,
     CovenantSummary,
+    ExcludedAsset,
     OnChainCovenantResult,
 )
 
@@ -76,7 +77,13 @@ class FakeCovenantRegistryClient:
                 assets_excluded=result.summary.assets_excluded,
             ),
             included_assets=result.included_assets,
-            excluded_assets=[asset.external_id for asset in result.excluded_assets],
+            excluded_assets=[
+                ExcludedAsset(
+                    external_id=asset.external_id,
+                    reasons=list(asset.reasons),
+                )
+                for asset in result.excluded_assets
+            ],
             updated_at=self._transaction_count,
             exists=True,
             chain_id=self.chain_id,

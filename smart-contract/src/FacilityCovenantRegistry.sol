@@ -7,6 +7,11 @@ contract FacilityCovenantRegistry {
         BREACH
     }
 
+    struct ExcludedAsset {
+        string externalId;
+        string[] reasons;
+    }
+
     struct FacilityReport {
         string facility;
         uint16 effectiveRateBps;
@@ -15,7 +20,7 @@ contract FacilityCovenantRegistry {
         uint32 assetsIncludedCount;
         uint32 assetsExcludedCount;
         string[] includedExternalIds;
-        string[] excludedExternalIds;
+        ExcludedAsset[] excludedAssets;
         uint64 updatedAt;
         address updatedBy;
         bool exists;
@@ -70,11 +75,11 @@ contract FacilityCovenantRegistry {
         CovenantStatus covenantStatus,
         uint32 totalAssetsEvaluated,
         string[] calldata includedExternalIds,
-        string[] calldata excludedExternalIds
+        ExcludedAsset[] calldata excludedAssets
     ) external onlyAllowedWriter {
         bytes32 reportKey = _validatedFacilityKey(facility);
         uint32 assetsIncludedCount = uint32(includedExternalIds.length);
-        uint32 assetsExcludedCount = uint32(excludedExternalIds.length);
+        uint32 assetsExcludedCount = uint32(excludedAssets.length);
 
         if (totalAssetsEvaluated != assetsIncludedCount + assetsExcludedCount) {
             revert SummaryCountMismatch();
@@ -92,7 +97,7 @@ contract FacilityCovenantRegistry {
         report.exists = true;
 
         _replaceArray(report.includedExternalIds, includedExternalIds);
-        _replaceArray(report.excludedExternalIds, excludedExternalIds);
+        _replaceExcludedAssets(report.excludedAssets, excludedAssets);
 
         emit FacilityReportUpdated(
             reportKey,
@@ -163,6 +168,17 @@ contract FacilityCovenantRegistry {
         }
         for (uint256 index = 0; index < source.length; index++) {
             target.push(source[index]);
+        }
+    }
+
+    function _replaceExcludedAssets(ExcludedAsset[] storage target, ExcludedAsset[] calldata source) internal {
+        while (target.length > 0) {
+            target.pop();
+        }
+        for (uint256 index = 0; index < source.length; index++) {
+            target.push();
+            target[index].externalId = source[index].externalId;
+            _replaceArray(target[index].reasons, source[index].reasons);
         }
     }
 }

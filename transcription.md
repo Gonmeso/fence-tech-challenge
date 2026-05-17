@@ -1081,3 +1081,95 @@ session responses, rather than reduced to short summaries.
   Fixed the remaining health-test isolation bug by patching the module-level `get_settings` reference used by the health endpoint itself, not just `main`. The dedicated `test_app` fixture now also overrides `api.v1.endpoints.health.get_settings`, so the health response is decoupled from the local `.env` file during tests.
 
   Verified the health test passes with the fixture-backed app, and reran the relevant lint and type checks on the touched files.
+
+## Entry 056
+- Timestamp: 2026-05-17 17:39:34 CEST
+- Type: development
+- Status: completed
+- Human
+  Lets include the reasons in the GET result, rember that you can use scripts/curl_covenant_samples.sh to check this
+- Agent
+  Added exclusion reasons to `GET /api/v1/covenants/result` by changing the read schema to return structured `excluded_assets` entries and by caching the full published covenant result in the backend registry client after a successful publish. The on-chain read still supplies the verifiable facility/rate/summary data, and the API now merges back the excluded-asset reasons from the local published result when available. If a report is read without a local cached publish in the current process, excluded assets still deserialize with empty `reasons` lists instead of dropping the field.
+
+  Updated the fake registry test client and the integration/e2e assertions so GET now matches the POST excluded-asset structure, including reasons.
+
+  Verification passed:
+  - `rtk uv run pytest tests/integration/test_covenant_api.py tests/unit/test_covenant_handler.py tests/unit/test_covenant_registry_client.py`
+  - `rtk uv run pytest tests/e2e/test_covenant_on_chain.py`
+  - `bash scripts/curl_covenant_samples.sh`
+
+  The curl check confirmed that for `educa`, `payearly`, and `nomina`, the GET response now returns the same `excluded_assets` objects with `external_id` and `reasons` that the POST response returned.
+
+## Entry 057
+- Timestamp: 2026-05-17 17:39:34 CEST
+- Type: development
+- Status: completed
+- Human
+  Lets plan to add these reasons to the smart-contract.
+  * Create a complex type to save the reasons, which will be a string (external-id) and a list of strings with the reasons
+  * Add tests for these
+  * Make sure that the e2e test check these in python
+- Agent
+  Plan reviewed against the current contract and e2e flow. The recommendation is to store excluded assets on-chain as a nested struct array, update the Solidity write/read signatures accordingly, regenerate the checked-in ABI, map the nested tuple data back into the existing Python schema, and tighten the Python e2e so it proves the GET reasons came from the contract rather than the in-process backend cache.
+
+  The key risk called out in the plan is test false confidence: the current e2e passes even if the contract does not store reasons, because the backend client caches the published result in memory after POST and merges that back into GET. The contract change plan therefore includes forcing a fresh registry client or clearing the cache before the GET assertion in Python.
+
+## Entry 058
+- Timestamp: 2026-05-17 17:39:34 CEST
+- Type: development
+- Status: completed
+- Human
+  Probably python wilkl need changes in the covenant registry to make sure that the summary is fully save, check that
+- Agent
+  Checked the current Python registry client and contract write path. For the summary specifically, Python already sends `totalAssetsEvaluated`, and the contract derives and stores `assetsIncludedCount` and `assetsExcludedCount` from the included/excluded array lengths. On read, Python reconstructs the API summary from those three stored values.
+
+  So for summary persistence there is no missing Python change today. The required Python changes for the contract-reasons plan are instead:
+  - change the publish call to send excluded assets as nested `(external_id, reasons[])` structs,
+  - change the read mapping to decode nested structs back into `ExcludedAsset`,
+  - update tests so the e2e clears the in-memory registry client before GET and proves both summary and reasons came back from chain.
+
+## Entry 059
+- Timestamp: 2026-05-17 17:58:35 CEST
+- Type: development
+- Status: completed
+- Human
+  Execute the plan, also make that when readyng the report we use a pydantic schema to also do data validation an not accessing the data as report[i]
+- Agent
+  Implemented the contract-backed excluded-asset reasons flow end to end.
+
+  Solidity:
+  - Added `ExcludedAsset { externalId, reasons }` to the registry contract and changed `FacilityReport` to store `ExcludedAsset[]` instead of plain excluded external IDs.
+  - Updated `updateFacilityReport(...)` to accept nested excluded assets and persist them with a dedicated `_replaceExcludedAssets(...)` helper.
+  - Extended Foundry coverage for storing nested reasons, overwriting nested arrays, summary mismatch, and the restricted-writer path.
+
+  Backend:
+  - Regenerated the checked-in ABI in `backend/contracts/FacilityCovenantRegistry.abi.json`.
+  - Updated the registry publish call to encode excluded assets as nested tuples `(external_id, reasons[])`.
+  - Added Pydantic contract-read models that validate the tuple shape and summary consistency before mapping into the API schema, replacing the previous raw `report[i]` indexing approach.
+  - Removed the old in-memory merge behavior from the contract read path so GET is now chain-backed.
+  - Tightened the Python e2e by resetting the registry client cache before the GET request, so the assertion proves the reasons and summary came back from the contract.
+
+  Also updated the smart-contract README field list so it reflects that excluded assets now store reasons.
+
+  Verification passed:
+  - `rtk forge test --offline`
+  - `rtk uv run pytest tests/unit/test_covenant_registry_client.py tests/integration/test_covenant_api.py tests/e2e/test_covenant_on_chain.py`
+  - `rtk uv run ruff check core/clients/covenant_registry.py schemas/covenant.py tests/unit/test_covenant_registry_client.py tests/e2e/test_covenant_on_chain.py`
+
+  During the work, the first Python e2e failure exposed the expected stale-ABI mismatch (`string[]` vs nested excluded-asset tuples), and the first ABI rewrite attempt was corrupted by the token-saving wrapper truncating JSON output. Both were corrected by regenerating the ABI from the rebuilt contract and rewriting it through `rtk proxy`.
+
+## Entry 060
+- Timestamp: 2026-05-17 18:03:20 CEST
+- Type: development
+- Status: completed
+- Human
+  Test it with scripts/run_local_stack.sh and scripts/curl_covenant_samples.sh and check both outputs of POST and GET
+- Agent
+  Started the full local stack with `bash scripts/run_local_stack.sh`, then ran `bash scripts/curl_covenant_samples.sh` against it and compared the POST and GET payloads for `educa`, `payearly`, and `nomina`.
+
+  Result:
+  - `educa`: POST and GET matched on covenant status, summary, included assets, and excluded assets with reasons.
+  - `nomina`: POST and GET matched on covenant status, summary, included assets, and excluded assets with reasons.
+  - `payearly`: POST and GET matched on covenant status, summary, included assets, and excluded assets with reasons, but there is a formatting mismatch on `computed_effective_rate`: POST returned `"0.00"` while GET returned `"0"`.
+
+  The stack was then stopped cleanly after verification.

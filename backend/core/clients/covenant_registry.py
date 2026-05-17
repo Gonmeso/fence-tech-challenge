@@ -16,10 +16,12 @@ from core.exceptions import (
 from core.settings import Settings
 from core.utils.contract_abi import load_registry_abi
 from schemas.covenant import (
+    ContractFacilityReport,
     CovenantPublication,
     CovenantResult,
     CovenantStatus,
     CovenantSummary,
+    ExcludedAsset,
     OnChainCovenantResult,
 )
 
@@ -91,7 +93,6 @@ class AsyncCovenantRegistryClient:
         self._web3 = AsyncWeb3(AsyncHTTPProvider(config.rpc_url))
         self._account = Account.from_key(config.private_key)
         self._contract = self._web3.eth.contract(address=checksum_address, abi=config.abi)
-
     async def publish_facility_report(
         self,
         *,
@@ -122,7 +123,7 @@ class AsyncCovenantRegistryClient:
                 _status_to_contract_value(result.covenant_status),
                 result.summary.total_assets_evaluated,
                 result.included_assets,
-                [asset.external_id for asset in result.excluded_assets],
+                [(asset.external_id, asset.reasons) for asset in result.excluded_assets],
             )
             transaction = await function.build_transaction(
                 {
@@ -187,6 +188,11 @@ class AsyncCovenantRegistryClient:
             if not exists:
                 raise CovenantReportNotFoundError(facility_type=facility_type)
             report = await self._contract.functions.getFacilityReport(facility_type.value).call()
+            return _report_to_schema(
+                report=report,
+                chain_id=self.chain_id,
+                contract_address=self.contract_address,
+            )
         except CovenantReportNotFoundError:
             raise
         except Exception as exc:
@@ -194,12 +200,6 @@ class AsyncCovenantRegistryClient:
                 details=[{"facility_type": facility_type.value}],
                 private_details=[{"facility_type": facility_type.value, "error": str(exc)}],
             ) from exc
-
-        return _report_to_schema(
-            report=report,
-            chain_id=self.chain_id,
-            contract_address=self.contract_address,
-        )
 
 
 class CovenantRegistryClientRegistry:
@@ -352,21 +352,28 @@ def _report_to_schema(
         OnChainCovenantResult: API representation of the on-chain report.
     """
 
-    effective_rate_bps = int(report[1])
+    contract_report = ContractFacilityReport.model_validate(report)
+    effective_rate_bps = contract_report.effective_rate_bps
     return OnChainCovenantResult(
-        facility=report[0],
+        facility=contract_report.facility,
         effective_rate_bps=effective_rate_bps,
         computed_effective_rate=Decimal(effective_rate_bps) / Decimal("100"),
-        covenant_status=_status_from_contract_value(int(report[2])),
+        covenant_status=_status_from_contract_value(contract_report.covenant_status),
         summary=CovenantSummary(
-            total_assets_evaluated=int(report[3]),
-            assets_included=int(report[4]),
-            assets_excluded=int(report[5]),
+            total_assets_evaluated=contract_report.total_assets_evaluated,
+            assets_included=contract_report.assets_included_count,
+            assets_excluded=contract_report.assets_excluded_count,
         ),
-        included_assets=list(report[6]),
-        excluded_assets=list(report[7]),
-        updated_at=int(report[8]),
-        exists=bool(report[10]),
+        included_assets=contract_report.included_external_ids,
+        excluded_assets=[
+            ExcludedAsset(
+                external_id=excluded_asset.external_id,
+                reasons=excluded_asset.reasons,
+            )
+            for excluded_asset in contract_report.excluded_assets
+        ],
+        updated_at=contract_report.updated_at,
+        exists=contract_report.exists,
         chain_id=chain_id,
         contract_address=contract_address,
     )

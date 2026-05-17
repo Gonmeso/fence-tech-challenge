@@ -222,6 +222,7 @@ def test_covenant_result_endpoint_reads_published_report(
         "assets_included": 4,
         "assets_excluded": 4,
     }
+    assert body["excluded_assets"] == publish_response.json()["excluded_assets"]
     assert "updated_by" not in body
 
 
