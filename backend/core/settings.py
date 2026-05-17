@@ -30,8 +30,8 @@ class Settings(BaseSettings):
     nomina_covenant_threshold: Decimal = Decimal("5.0")
     web3_chain_id: int = 31337
     web3_rpc_url: str = "http://127.0.0.1:8545"
-    covenant_registry_address: str | None = None
-    covenant_registry_private_key: str | None = None
+    covenant_registry_address: str
+    covenant_registry_private_key: str
     covenant_registry_abi_path: Path = default_registry_abi_path()
 
     model_config = SettingsConfigDict(

@@ -93,6 +93,7 @@ class AsyncCovenantRegistryClient:
         self._web3 = AsyncWeb3(AsyncHTTPProvider(config.rpc_url))
         self._account = Account.from_key(config.private_key)
         self._contract = self._web3.eth.contract(address=checksum_address, abi=config.abi)
+
     async def publish_facility_report(
         self,
         *,
