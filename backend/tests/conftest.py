@@ -149,6 +149,8 @@ def test_settings() -> Settings:
         educa_covenant_threshold=Decimal("22.0"),
         payearly_covenant_threshold=Decimal("3.0"),
         nomina_covenant_threshold=Decimal("5.0"),
+        covenant_registry_address="0x0000000000000000000000000000000000000001",
+        covenant_registry_private_key="0x0000000000000000000000000000000000000000000000000000000000000001",
     )
 
 
