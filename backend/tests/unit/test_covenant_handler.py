@@ -10,6 +10,9 @@ from core.settings import Settings
 from schemas.covenant import CovenantResult
 from tests.conftest import FakeCovenantRegistryClient
 
+TEST_REGISTRY_ADDRESS = "0x0000000000000000000000000000000000000001"
+TEST_REGISTRY_PRIVATE_KEY = "0x0000000000000000000000000000000000000000000000000000000000000001"
+
 
 def build_handler(
     registry_client: FakeCovenantRegistryClient | None = None,
@@ -29,6 +32,8 @@ def build_handler(
                 educa_covenant_threshold=Decimal("22.0"),
                 payearly_covenant_threshold=Decimal("3.0"),
                 nomina_covenant_threshold=Decimal("5.0"),
+                covenant_registry_address=TEST_REGISTRY_ADDRESS,
+                covenant_registry_private_key=TEST_REGISTRY_PRIVATE_KEY,
             )
         ),
         registry_client=registry_client,
@@ -142,6 +147,8 @@ def test_covenant_handler_calculate_and_publish_runs_calculation_in_worker_threa
                 educa_covenant_threshold=Decimal("22.0"),
                 payearly_covenant_threshold=Decimal("3.0"),
                 nomina_covenant_threshold=Decimal("5.0"),
+                covenant_registry_address=TEST_REGISTRY_ADDRESS,
+                covenant_registry_private_key=TEST_REGISTRY_PRIVATE_KEY,
             )
         ),
         registry_client=registry_client,

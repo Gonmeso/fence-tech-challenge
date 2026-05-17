@@ -72,3 +72,15 @@ Deploy:
 ```shell
 forge script script/Deploy.s.sol:DeployFacilityCovenantRegistry --rpc-url <rpc_url> --broadcast
 ```
+
+Read a saved facility value with `cast`:
+
+```shell
+bash smart-contract/script/check_saved_value.sh <contract_address> educa <rpc_url>
+bash smart-contract/script/check_saved_value.sh <contract_address> payearly <rpc_url>
+bash smart-contract/script/check_saved_value.sh <contract_address> nomia <rpc_url>
+```
+
+The helper accepts `educa`, `payearly`, and `nomia` as input values. `nomia`
+is normalized to the on-chain facility key `nomina` before calling the
+contract.

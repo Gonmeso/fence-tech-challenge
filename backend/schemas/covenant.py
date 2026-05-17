@@ -1,5 +1,6 @@
 from decimal import Decimal
 from enum import StrEnum
+from typing import Any, cast
 
 from pydantic import BaseModel, field_serializer, model_validator
 
@@ -104,11 +105,15 @@ class ContractExcludedAsset(BaseModel):
         """Support web3 tuple results as model input."""
 
         if isinstance(data, (list, tuple)):
-            if len(data) != 2:
+            tuple_data = cast(tuple[Any, ...], data)
+            if len(tuple_data) != 2:
                 raise ValueError("Excluded asset contract tuple must contain 2 items")
+            reasons = tuple_data[1]
+            if not isinstance(reasons, (list, tuple)):
+                raise ValueError("Excluded asset reasons must be a list or tuple")
             return {
-                "external_id": str(data[0]),
-                "reasons": list(data[1]),
+                "external_id": str(tuple_data[0]),
+                "reasons": [str(reason) for reason in reasons],
             }
         return data
 
@@ -134,20 +139,29 @@ class ContractFacilityReport(BaseModel):
         """Support web3 tuple results as model input."""
 
         if isinstance(data, (list, tuple)):
-            if len(data) != 11:
+            tuple_data = cast(tuple[Any, ...], data)
+            if len(tuple_data) != 11:
                 raise ValueError("Facility report contract tuple must contain 11 items")
+            included_external_ids = tuple_data[6]
+            excluded_assets = tuple_data[7]
+            if not isinstance(included_external_ids, (list, tuple)):
+                raise ValueError("Included external IDs must be a list or tuple")
+            if not isinstance(excluded_assets, (list, tuple)):
+                raise ValueError("Excluded assets must be a list or tuple")
             return {
-                "facility": str(data[0]),
-                "effective_rate_bps": int(data[1]),
-                "covenant_status": int(data[2]),
-                "total_assets_evaluated": int(data[3]),
-                "assets_included_count": int(data[4]),
-                "assets_excluded_count": int(data[5]),
-                "included_external_ids": list(data[6]),
-                "excluded_assets": list(data[7]),
-                "updated_at": int(data[8]),
-                "updated_by": str(data[9]),
-                "exists": bool(data[10]),
+                "facility": str(tuple_data[0]),
+                "effective_rate_bps": int(tuple_data[1]),
+                "covenant_status": int(tuple_data[2]),
+                "total_assets_evaluated": int(tuple_data[3]),
+                "assets_included_count": int(tuple_data[4]),
+                "assets_excluded_count": int(tuple_data[5]),
+                "included_external_ids": [
+                    str(external_id) for external_id in included_external_ids
+                ],
+                "excluded_assets": list(excluded_assets),
+                "updated_at": int(tuple_data[8]),
+                "updated_by": str(tuple_data[9]),
+                "exists": bool(tuple_data[10]),
             }
         return data
 

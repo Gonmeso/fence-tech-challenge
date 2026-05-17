@@ -49,4 +49,4 @@ def get_settings() -> Settings:
         Settings: Cached application settings.
     """
 
-    return Settings()
+    return Settings()  # ty: ignore[missing-argument]

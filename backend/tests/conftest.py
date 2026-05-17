@@ -1,3 +1,4 @@
+import os
 import sys
 from collections.abc import Iterator
 from decimal import ROUND_HALF_UP, Decimal
@@ -7,6 +8,15 @@ import pytest
 from fastapi.testclient import TestClient
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+os.environ.setdefault(
+    "FENCE_COVENANT_REGISTRY_ADDRESS",
+    "0x0000000000000000000000000000000000000001",
+)
+os.environ.setdefault(
+    "FENCE_COVENANT_REGISTRY_PRIVATE_KEY",
+    "0x0000000000000000000000000000000000000000000000000000000000000001",
+)
 
 import api.v1.endpoints.health as health_endpoint
 import main as app_module
@@ -120,6 +130,8 @@ def settings() -> Settings:
         educa_covenant_threshold=Decimal("22.0"),
         payearly_covenant_threshold=Decimal("3.0"),
         nomina_covenant_threshold=Decimal("5.0"),
+        covenant_registry_address="0x0000000000000000000000000000000000000001",
+        covenant_registry_private_key="0x0000000000000000000000000000000000000000000000000000000000000001",
     )
 
 

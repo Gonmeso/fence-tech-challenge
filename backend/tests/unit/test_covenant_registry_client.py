@@ -17,11 +17,7 @@ from schemas.covenant import ContractFacilityReport, CovenantStatus
 def test_registry_abi_loader_reads_checked_in_abi() -> None:
     abi = load_registry_abi()
 
-    functions = {
-        entry["name"]: entry
-        for entry in abi
-        if entry.get("type") == "function"
-    }
+    functions = {entry["name"]: entry for entry in abi if entry.get("type") == "function"}
     assert {"getFacilityReport", "reportExists", "updateFacilityReport"} <= set(functions)
 
     update_report = functions["updateFacilityReport"]

@@ -17,15 +17,27 @@ from core.exceptions import (
 )
 from core.settings import Settings
 
+TEST_REGISTRY_ADDRESS = "0x0000000000000000000000000000000000000001"
+TEST_REGISTRY_PRIVATE_KEY = "0x0000000000000000000000000000000000000000000000000000000000000001"
+
+
+def build_settings(
+    *,
+    educa_covenant_threshold: Decimal = Decimal("22.0"),
+    payearly_covenant_threshold: Decimal = Decimal("3.0"),
+    nomina_covenant_threshold: Decimal = Decimal("5.0"),
+) -> Settings:
+    return Settings(
+        educa_covenant_threshold=educa_covenant_threshold,
+        payearly_covenant_threshold=payearly_covenant_threshold,
+        nomina_covenant_threshold=nomina_covenant_threshold,
+        covenant_registry_address=TEST_REGISTRY_ADDRESS,
+        covenant_registry_private_key=TEST_REGISTRY_PRIVATE_KEY,
+    )
+
 
 def test_resolver_returns_educa_calculator_for_educa_payload() -> None:
-    resolver = CalculatorResolver(
-        Settings(
-            educa_covenant_threshold=Decimal("21.5"),
-            payearly_covenant_threshold=Decimal("3.0"),
-            nomina_covenant_threshold=Decimal("5.0"),
-        )
-    )
+    resolver = CalculatorResolver(build_settings(educa_covenant_threshold=Decimal("21.5")))
     payload = json.dumps(
         [
             {
@@ -59,7 +71,7 @@ def test_resolver_returns_educa_calculator_for_educa_payload() -> None:
 
 
 def test_resolver_returns_payearly_calculator_for_payearly_payload() -> None:
-    resolver = CalculatorResolver(Settings())
+    resolver = CalculatorResolver(build_settings())
     payload = [
         {
             "external_id": "PAY-1",
@@ -93,7 +105,7 @@ def test_resolver_returns_payearly_calculator_for_payearly_payload() -> None:
 
 
 def test_resolver_returns_nomina_calculator_for_nomina_payload() -> None:
-    resolver = CalculatorResolver(Settings())
+    resolver = CalculatorResolver(build_settings())
     payload = json.dumps(
         [
             {
@@ -128,7 +140,7 @@ def test_resolver_returns_nomina_calculator_for_nomina_payload() -> None:
 
 
 def test_resolver_rejects_invalid_json() -> None:
-    resolver = CalculatorResolver(Settings())
+    resolver = CalculatorResolver(build_settings())
 
     with pytest.raises(InvalidJsonPayloadError, match="Payload is not valid JSON"):
         resolver.resolve(
@@ -138,7 +150,7 @@ def test_resolver_rejects_invalid_json() -> None:
 
 
 def test_resolver_rejects_invalid_utf8_bytes() -> None:
-    resolver = CalculatorResolver(Settings())
+    resolver = CalculatorResolver(build_settings())
 
     with pytest.raises(InvalidJsonPayloadError, match="Payload is not valid JSON"):
         resolver.resolve(
@@ -148,7 +160,7 @@ def test_resolver_rejects_invalid_utf8_bytes() -> None:
 
 
 def test_resolver_rejects_non_array_json() -> None:
-    resolver = CalculatorResolver(Settings())
+    resolver = CalculatorResolver(build_settings())
 
     with pytest.raises(InvalidPayloadTypeError, match="Payload must be a JSON array"):
         resolver.resolve(
@@ -158,7 +170,7 @@ def test_resolver_rejects_non_array_json() -> None:
 
 
 def test_resolver_rejects_payload_for_declared_facility() -> None:
-    resolver = CalculatorResolver(Settings())
+    resolver = CalculatorResolver(build_settings())
     payload = json.dumps(
         [
             {

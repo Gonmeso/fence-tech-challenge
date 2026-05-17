@@ -14,7 +14,18 @@ def test_settings_reads_log_level_environment_variable(monkeypatch: MonkeyPatch)
     """
 
     monkeypatch.setenv("FENCE_LOG_LEVEL", "DEBUG")
+    monkeypatch.setenv(
+        "FENCE_COVENANT_REGISTRY_ADDRESS",
+        "0x0000000000000000000000000000000000000001",
+    )
+    monkeypatch.setenv(
+        "FENCE_COVENANT_REGISTRY_PRIVATE_KEY",
+        "0x0000000000000000000000000000000000000000000000000000000000000001",
+    )
 
-    settings = Settings()
+    settings = Settings(
+        covenant_registry_address="0x0000000000000000000000000000000000000001",
+        covenant_registry_private_key="0x0000000000000000000000000000000000000000000000000000000000000001",
+    )
 
     assert settings.log_level is LogLevel.DEBUG
